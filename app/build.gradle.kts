@@ -36,6 +36,10 @@ android {
     buildFeatures {
         viewBinding = true
     }
+    testOptions {
+        unitTests.isIncludeAndroidResources = false
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -43,4 +47,5 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.constraintlayout)
+    testImplementation(libs.junit)
 }

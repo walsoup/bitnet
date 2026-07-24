@@ -46,7 +46,7 @@ class TunPacketRouter(
                 }
             }
             FrameType.CLOSE -> {
-                activeStreams.values.remove(streamId)
+                activeStreams.entries.removeIf { it.value == streamId }
                 streamToKey.remove(streamId)
             }
             else -> {}
@@ -116,7 +116,7 @@ class TunPacketRouter(
         }
     }
 
-    private fun buildIPv4Packet(protocol: Byte, srcIp: ByteArray, srcPort: Int, dstPort: Int, payload: ByteArray): ByteArray {
+    internal fun buildIPv4Packet(protocol: Byte, srcIp: ByteArray, srcPort: Int, dstPort: Int, payload: ByteArray): ByteArray {
         val headerLen = 20
         val transportLen = if (protocol.toInt() == 6) 20 else 8
         val totalLen = headerLen + transportLen + payload.size
@@ -156,16 +156,57 @@ class TunPacketRouter(
         packet[headerLen + 2] = (dstPort shr 8).toByte()
         packet[headerLen + 3] = dstPort.toByte()
 
-        if (protocol.toInt() == 17) {
+        if (protocol.toInt() == 6) { // TCP
+            // Data Offset (5 32-bit words = 20 bytes header)
+            packet[headerLen + 12] = 0x50.toByte()
+            // Flags: ACK (0x10) | PSH (0x08) = 0x18
+            packet[headerLen + 13] = 0x18.toByte()
+            // Window Size: 65535 (0xFFFF)
+            packet[headerLen + 14] = 0xFF.toByte()
+            packet[headerLen + 15] = 0xFF.toByte()
+
+            // Copy payload before checksum calculation
+            if (payload.isNotEmpty()) {
+                System.arraycopy(payload, 0, packet, headerLen + transportLen, payload.size)
+            }
+
+            // TCP Checksum calculation over Pseudo-Header + TCP Header + Payload
+            var tcpSum = 0
+            tcpSum += ((srcIp[0].toInt() and 0xFF) shl 8) or (srcIp[1].toInt() and 0xFF)
+            tcpSum += ((srcIp[2].toInt() and 0xFF) shl 8) or (srcIp[3].toInt() and 0xFF)
+            tcpSum += (10 shl 8) or 0
+            tcpSum += (8 shl 8) or 2
+            tcpSum += 6
+            val tcpLen = transportLen + payload.size
+            tcpSum += tcpLen
+
+            val segmentLen = transportLen + payload.size
+            for (i in 0 until segmentLen step 2) {
+                val offset = headerLen + i
+                val word = if (i + 1 < segmentLen) {
+                    ((packet[offset].toInt() and 0xFF) shl 8) or (packet[offset + 1].toInt() and 0xFF)
+                } else {
+                    (packet[offset].toInt() and 0xFF) shl 8
+                }
+                tcpSum += word
+            }
+
+            while ((tcpSum shr 16) > 0) {
+                tcpSum = (tcpSum and 0xFFFF) + (tcpSum shr 16)
+            }
+            val tcpChecksum = tcpSum.inv() and 0xFFFF
+            packet[headerLen + 16] = (tcpChecksum shr 8).toByte()
+            packet[headerLen + 17] = tcpChecksum.toByte()
+        } else if (protocol.toInt() == 17) { // UDP
             // UDP Length
             val udpLen = transportLen + payload.size
             packet[headerLen + 4] = (udpLen shr 8).toByte()
             packet[headerLen + 5] = udpLen.toByte()
-        }
 
-        // Payload
-        if (payload.isNotEmpty()) {
-            System.arraycopy(payload, 0, packet, headerLen + transportLen, payload.size)
+            // Payload
+            if (payload.isNotEmpty()) {
+                System.arraycopy(payload, 0, packet, headerLen + transportLen, payload.size)
+            }
         }
 
         return packet
