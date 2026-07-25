@@ -4,11 +4,14 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
+import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.net.VpnService
@@ -19,6 +22,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.HapticFeedbackConstants
+import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.OvershootInterpolator
@@ -27,12 +31,17 @@ import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.bluenet.client.BlueNetVpnService
 import com.bluenet.databinding.ActivityMainBinding
+import com.bluenet.databinding.DialogBluetoothScanBinding
 import com.bluenet.host.HostService
 import com.bluenet.utils.BluetoothUtils
+import com.bluenet.utils.PreferencesManager
+import com.bluenet.utils.ScannedDeviceAdapter
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class MainActivity : AppCompatActivity() {
 
@@ -99,6 +108,7 @@ class MainActivity : AppCompatActivity() {
         setupHostUi()
         setupClientUi()
         setupTouchBounces()
+        restoreSavedPreferences()
 
         requestBluetoothPermissions()
 
@@ -109,16 +119,37 @@ class MainActivity : AppCompatActivity() {
         bindService(vpnIntent, vpnServiceConnection, Context.BIND_AUTO_CREATE)
     }
 
-    /**
-     * Attach tactile spring bounce & haptic feedback touch listeners to interactive controls
-     */
+    private fun restoreSavedPreferences() {
+        val lastMode = PreferencesManager.getLastMode(this)
+        if (lastMode == "host") {
+            binding.rgModeSelector.check(R.id.btnHostMode)
+            binding.cardHost.visibility = View.VISIBLE
+            binding.cardClient.visibility = View.GONE
+        } else {
+            binding.rgModeSelector.check(R.id.btnClientMode)
+            binding.cardHost.visibility = View.GONE
+            binding.cardClient.visibility = View.VISIBLE
+        }
+
+        val savedMac = PreferencesManager.getLastMac(this)
+        val savedPsm = PreferencesManager.getLastPsm(this)
+        val compatMode = PreferencesManager.getCompatMode(this)
+
+        if (savedMac.isNotEmpty()) {
+            binding.etMacAddress.setText(savedMac)
+        }
+        binding.etPsm.setText(savedPsm.toString())
+        binding.swCompatMode.isChecked = compatMode
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     private fun setupTouchBounces() {
         val bounceViews = listOf(
             binding.btnToggleHost,
             binding.btnToggleClient,
             binding.btnCopyHostInfo,
-            binding.btnRefreshDevices
+            binding.btnRefreshDevices,
+            binding.btnScanNearby
         )
 
         for (v in bounceViews) {
@@ -149,7 +180,7 @@ class MainActivity : AppCompatActivity() {
     private fun triggerHaptic(type: Int = HapticFeedbackConstants.CONTEXT_CLICK) {
         try {
             binding.root.performHapticFeedback(type)
-            
+
             val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 vm?.defaultVibrator
@@ -198,8 +229,10 @@ class MainActivity : AppCompatActivity() {
             triggerHaptic(HapticFeedbackConstants.CLOCK_TICK)
 
             if (checkedId == R.id.btnHostMode) {
+                PreferencesManager.saveLastMode(this, "host")
                 animateCardSwitch(binding.cardClient, binding.cardHost)
             } else {
+                PreferencesManager.saveLastMode(this, "client")
                 animateCardSwitch(binding.cardHost, binding.cardClient)
                 refreshPairedDevicesSafely()
             }
@@ -233,7 +266,6 @@ class MainActivity : AppCompatActivity() {
             permissions.add(Manifest.permission.BLUETOOTH_SCAN)
             permissions.add(Manifest.permission.BLUETOOTH_ADVERTISE)
         } else {
-            // Location permissions are mandatory for Bluetooth discovery on Android 10 (API 29) & Android 11 (API 30)
             permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
             permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION)
         }
@@ -323,7 +355,6 @@ class MainActivity : AppCompatActivity() {
             val clip = ClipData.newPlainText("BlueNet Host Info", textToCopy)
             clipboard.setPrimaryClip(clip)
 
-            // Pulse bounce on copy button
             binding.btnCopyHostInfo.animate()
                 .scaleX(1.15f)
                 .scaleY(1.15f)
@@ -355,6 +386,11 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Refreshed paired Bluetooth devices", Toast.LENGTH_SHORT).show()
         }
 
+        binding.btnScanNearby.setOnClickListener {
+            triggerHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+            showScannerDialog()
+        }
+
         binding.btnToggleClient.setOnClickListener {
             val service = vpnService ?: return@setOnClickListener
             if (service.isVpnConnected) {
@@ -367,6 +403,83 @@ class MainActivity : AppCompatActivity() {
                 checkVpnPermissionAndConnect()
             }
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun showScannerDialog() {
+        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        val adapter = bluetoothManager?.adapter
+
+        if (adapter == null || !adapter.isEnabled) {
+            Toast.makeText(this, "Bluetooth must be enabled to scan", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val dialogBinding = DialogBluetoothScanBinding.inflate(LayoutInflater.from(this))
+        val scannedAdapter = ScannedDeviceAdapter { selectedDevice ->
+            triggerHaptic(HapticFeedbackConstants.CONFIRM)
+            binding.etMacAddress.setText(selectedDevice.address)
+            binding.tilMacAddress.error = null
+            Toast.makeText(this, "Selected ${selectedDevice.name ?: selectedDevice.address}", Toast.LENGTH_SHORT).show()
+        }
+
+        dialogBinding.rvScannedDevices.layoutManager = LinearLayoutManager(this)
+        dialogBinding.rvScannedDevices.adapter = scannedAdapter
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setView(dialogBinding.root)
+            .setCancelable(true)
+            .create()
+
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                when (intent?.action) {
+                    BluetoothDevice.ACTION_FOUND -> {
+                        val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                        }
+                        val rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE).toInt()
+                        if (device != null) {
+                            scannedAdapter.addOrUpdateDevice(device, rssi)
+                        }
+                    }
+                    BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
+                        dialogBinding.progressScanning.visibility = View.GONE
+                    }
+                }
+            }
+        }
+
+        val filter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_FOUND)
+            addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+        }
+        registerReceiver(receiver, filter)
+
+        dialogBinding.btnRescan.setOnClickListener {
+            triggerHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+            scannedAdapter.clear()
+            dialogBinding.progressScanning.visibility = View.VISIBLE
+            if (adapter.isDiscovering) {
+                adapter.cancelDiscovery()
+            }
+            adapter.startDiscovery()
+        }
+
+        dialog.setOnDismissListener {
+            try {
+                unregisterReceiver(receiver)
+            } catch (_: Exception) {}
+            if (adapter.isDiscovering) {
+                adapter.cancelDiscovery()
+            }
+        }
+
+        dialog.show()
+        adapter.startDiscovery()
     }
 
     private fun checkVpnPermissionAndConnect() {
@@ -400,10 +513,12 @@ class MainActivity : AppCompatActivity() {
             binding.tilMacAddress.error = null
         }
 
+        val compatMode = binding.swCompatMode.isChecked
+        PreferencesManager.saveClientConnection(this, targetMac, psm, compatMode)
+
         val vpnIntent = Intent(this, BlueNetVpnService::class.java)
         startService(vpnIntent)
 
-        val compatMode = binding.swCompatMode.isChecked
         vpnService?.connectToHost(targetMac, psm, compatMode) { statusText ->
             runOnUiThread {
                 updateClientUi()
@@ -593,7 +708,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Pulse bounce status dot indicator
         binding.ivStatusDot.animate()
             .scaleX(1.4f)
             .scaleY(1.4f)

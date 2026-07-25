@@ -1,15 +1,21 @@
 package com.bluenet.client
 
 import android.annotation.SuppressLint
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import com.bluenet.bluetooth.L2capClient
 import com.bluenet.multiplexer.StreamMultiplexer
 import java.io.FileInputStream
@@ -28,6 +34,19 @@ class BlueNetVpnService : VpnService() {
 
     inner class VpnBinder : Binder() {
         fun getService(): BlueNetVpnService = this@BlueNetVpnService
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannel()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_DISCONNECT_VPN) {
+            stopVpn()
+            return START_NOT_STICKY
+        }
+        return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -50,6 +69,7 @@ class BlueNetVpnService : VpnService() {
 
         val modeDesc = if (compatMode) "RFCOMM Compat Mode" else "PSM $psm"
         onStatusChanged("Connecting ($modeDesc) to $deviceAddress...")
+        startForeground(NOTIFICATION_ID, createNotification("Connecting to $deviceAddress..."))
 
         l2capClient = L2capClient(
             context = this,
@@ -106,6 +126,7 @@ class BlueNetVpnService : VpnService() {
             packetRouter?.start()
 
             isVpnConnected = true
+            updateNotification("BlueNet VPN Connected & Tunneling Traffic")
             onStatusChanged("Connected! Speed-optimized L2CAP Tethering Active")
             Log.d(TAG, "VPN Tunnel established over L2CAP")
         } catch (e: Exception) {
@@ -134,8 +155,52 @@ class BlueNetVpnService : VpnService() {
         vpnInterface = null
 
         isVpnConnected = false
+        stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
         Log.d(TAG, "BlueNetVpnService stopped")
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "BlueNet Client VPN Service",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            val manager = getSystemService(NotificationManager::class.java)
+            manager?.createNotificationChannel(channel)
+        }
+    }
+
+    private fun createNotification(content: String): Notification {
+        val intentToDisconnect = Intent(this, BlueNetVpnService::class.java).apply {
+            action = ACTION_DISCONNECT_VPN
+        }
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+        val disconnectPendingIntent = PendingIntent.getService(this, 0, intentToDisconnect, flags)
+
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("BlueNet Client VPN")
+            .setContentText(content)
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setOngoing(true)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Disconnect", disconnectPendingIntent)
+            .build()
+    }
+
+    @SuppressLint("MissingPermission", "NotificationPermission")
+    private fun updateNotification(content: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                return
+            }
+        }
+        val manager = getSystemService(NotificationManager::class.java)
+        manager?.notify(NOTIFICATION_ID, createNotification(content))
     }
 
     override fun onDestroy() {
@@ -145,5 +210,8 @@ class BlueNetVpnService : VpnService() {
 
     companion object {
         private const val TAG = "BlueNetVpnService"
+        private const val CHANNEL_ID = "bluenet_vpn_channel"
+        private const val NOTIFICATION_ID = 2002
+        const val ACTION_DISCONNECT_VPN = "com.bluenet.ACTION_DISCONNECT_VPN"
     }
 }

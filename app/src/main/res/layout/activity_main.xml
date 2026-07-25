@@ -410,6 +410,16 @@
                         android:textColor="?attr/colorOnSurfaceVariant"/>
 
                     <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnScanNearby"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:text="Scan Nearby"
+                        app:icon="@drawable/ic_bluetooth_host"
+                        app:iconGravity="textStart"
+                        style="?attr/materialButtonOutlinedStyle"
+                        android:layout_marginEnd="6dp"/>
+
+                    <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnRefreshDevices"
                         android:layout_width="44dp"
                         android:layout_height="44dp"

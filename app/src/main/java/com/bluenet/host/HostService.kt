@@ -123,12 +123,31 @@ class HostService : Service() {
         }
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP_HOST) {
+            stopHostServer()
+            return START_NOT_STICKY
+        }
+        return super.onStartCommand(intent, flags, startId)
+    }
+
     private fun createNotification(content: String): Notification {
+        val intentToStop = Intent(this, HostService::class.java).apply {
+            action = ACTION_STOP_HOST
+        }
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        } else {
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT
+        }
+        val stopPendingIntent = android.app.PendingIntent.getService(this, 0, intentToStop, flags)
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("BlueNet Bluetooth Host")
             .setContentText(content)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setOngoing(true)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Server", stopPendingIntent)
             .build()
     }
 
@@ -152,5 +171,6 @@ class HostService : Service() {
         private const val TAG = "HostService"
         private const val CHANNEL_ID = "bluenet_host_channel"
         private const val NOTIFICATION_ID = 1001
+        const val ACTION_STOP_HOST = "com.bluenet.ACTION_STOP_HOST"
     }
 }

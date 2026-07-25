@@ -55,6 +55,29 @@
             </intent-filter>
         </service>
 
+        <!-- Quick Settings Tile Services -->
+        <service
+            android:name=".service.BlueNetHostTileService"
+            android:icon="@drawable/ic_bluetooth_host"
+            android:label="BlueNet Host"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".service.BlueNetClientTileService"
+            android:icon="@drawable/ic_bluetooth_client"
+            android:label="BlueNet Client"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
     </application>
 
 </manifest>
