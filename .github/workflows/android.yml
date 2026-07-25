@@ -25,10 +25,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Run Lint
-        run: gradle lint
+        run: ./gradlew lint -Pandroid.aapt2FromMavenOverride=
 
       - name: Build Debug APK
-        run: gradle assembleDebug
+        run: ./gradlew assembleDebug -Pandroid.aapt2FromMavenOverride=
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
