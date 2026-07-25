@@ -115,6 +115,9 @@ class BlueNetVpnService : VpnService() {
         }
     }
 
+    fun getTxBytes(): Long = multiplexer?.getTxBytes() ?: 0L
+    fun getRxBytes(): Long = multiplexer?.getRxBytes() ?: 0L
+
     fun stopVpn() {
         packetRouter?.stop()
         packetRouter = null

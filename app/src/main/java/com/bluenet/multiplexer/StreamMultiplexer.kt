@@ -12,6 +12,8 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+
 
 class StreamMultiplexer(
     inputStream: InputStream,
@@ -30,6 +32,17 @@ class StreamMultiplexer(
 
     @Volatile
     private var lastActivityTimestamp = System.currentTimeMillis()
+
+    private val totalTxBytes = AtomicLong(0)
+    private val totalRxBytes = AtomicLong(0)
+
+    fun getTxBytes(): Long = totalTxBytes.get()
+    fun getRxBytes(): Long = totalRxBytes.get()
+
+    fun resetStats() {
+        totalTxBytes.set(0)
+        totalRxBytes.set(0)
+    }
 
     fun start() {
         readerThread = Thread({ readLoop() }, "MultiplexerReaderThread").apply { start() }
@@ -65,6 +78,7 @@ class StreamMultiplexer(
         try {
             val optimizedFrame = frame.compressIfBeneficial()
             optimizedFrame.writeTo(dos)
+            totalTxBytes.addAndGet(Frame.HEADER_SIZE + optimizedFrame.payload.size.toLong())
             lastActivityTimestamp = System.currentTimeMillis()
         } catch (e: IOException) {
             Log.e(TAG, "Error sending frame streamId=${frame.streamId}", e)
@@ -77,6 +91,7 @@ class StreamMultiplexer(
         try {
             while (isRunning.get()) {
                 val frame = Frame.readFrom(dis) ?: break
+                totalRxBytes.addAndGet(Frame.HEADER_SIZE + frame.payload.size.toLong())
                 lastActivityTimestamp = System.currentTimeMillis()
                 if (frame.type == FrameType.KEEPALIVE) {
                     continue

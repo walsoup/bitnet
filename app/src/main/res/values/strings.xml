@@ -5,10 +5,18 @@
     <string name="tab_client">Client Mode</string>
     <string name="btn_start_host">Start Server</string>
     <string name="btn_stop_host">Stop Server</string>
-    <string name="btn_connect_mac">Connect to Host MAC</string>
+    <string name="btn_connect_mac">Connect to Host</string>
     <string name="btn_disconnect">Disconnect</string>
-    <string name="host_mac_label">Host Device MAC Address:</string>
-    <string name="status_offline">Status: Offline</string>
-    <string name="select_device_label">Or Select Paired Device:</string>
-    <string name="enter_mac_label">Enter Host MAC Address (e.g. 00:11:22:33:44:55):</string>
+    <string name="host_mac_label">Host Device MAC Address</string>
+    <string name="status_offline">Offline</string>
+    <string name="select_device_label">Quick Connect (Paired Device)</string>
+    <string name="enter_mac_label">Manual Connection</string>
+    <string name="btn_copy_mac">Copy Info</string>
+    <string name="copied_to_clipboard">Copied Host info to clipboard!</string>
+    <string name="compat_mode_title">Compatibility Mode (RFCOMM Force)</string>
+    <string name="compat_mode_subtitle">Use for older Bluetooth devices or legacy hardware without L2CAP support</string>
+    <string name="traffic_tx">▲ Upload (TX)</string>
+    <string name="traffic_rx">▼ Download (RX)</string>
+    <string name="no_paired_devices">No paired Bluetooth devices found</string>
+    <string name="refresh_devices">Refresh List</string>
 </resources>

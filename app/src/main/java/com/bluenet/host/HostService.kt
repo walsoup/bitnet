@@ -94,6 +94,9 @@ class HostService : Service() {
         multiplexer.start()
     }
 
+    fun getTxBytes(): Long = activeMultiplexer?.getTxBytes() ?: 0L
+    fun getRxBytes(): Long = activeMultiplexer?.getRxBytes() ?: 0L
+
     fun stopHostServer() {
         activeMultiplexer?.close()
         activeMultiplexer = null

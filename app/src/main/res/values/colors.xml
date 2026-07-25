@@ -1,14 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#0D47A1</color>
-    <color name="primary_dark">#002171</color>
-    <color name="accent">#1E88E5</color>
-    <color name="accent_light">#E3F2FD</color>
-    <color name="status_green">#2E7D32</color>
-    <color name="status_green_bg">#E8F5E9</color>
-    <color name="status_red">#C62828</color>
-    <color name="bg_light">#F8F9FA</color>
-    <color name="text_dark">#1A1C1E</color>
-    <color name="text_muted">#73777F</color>
+    <!-- Material 3 Color System -->
+    <color name="md_theme_light_primary">#0B57D0</color>
+    <color name="md_theme_light_onPrimary">#FFFFFF</color>
+    <color name="md_theme_light_primaryContainer">#D3E3FD</color>
+    <color name="md_theme_light_onPrimaryContainer">#041E49</color>
+    
+    <color name="md_theme_light_secondary">#00639B</color>
+    <color name="md_theme_light_onSecondary">#FFFFFF</color>
+    <color name="md_theme_light_secondaryContainer">#C2E7FF</color>
+    <color name="md_theme_light_onSecondaryContainer">#001D33</color>
+    
+    <color name="md_theme_light_tertiary">#146C2E</color>
+    <color name="md_theme_light_onTertiary">#FFFFFF</color>
+    <color name="md_theme_light_tertiaryContainer">#C4EDD0</color>
+    <color name="md_theme_light_onTertiaryContainer">#00210B</color>
+
+    <color name="md_theme_light_error">#BA1A1A</color>
+    <color name="md_theme_light_errorContainer">#FFDAD6</color>
+    <color name="md_theme_light_onError">#FFFFFF</color>
+    <color name="md_theme_light_onErrorContainer">#410002</color>
+
+    <color name="md_theme_light_background">#F8F9FF</color>
+    <color name="md_theme_light_onBackground">#191C1E</color>
+    <color name="md_theme_light_surface">#FFFFFF</color>
+    <color name="md_theme_light_onSurface">#191C1E</color>
+    <color name="md_theme_light_surfaceVariant">#F1F3F9</color>
+    <color name="md_theme_light_onSurfaceVariant">#44474E</color>
+    <color name="md_theme_light_outline">#74777F</color>
+    <color name="md_theme_light_outlineVariant">#C4C6D0</color>
+
+    <!-- Legacy / Status helpers -->
+    <color name="primary">#0B57D0</color>
+    <color name="primary_dark">#041E49</color>
+    <color name="accent">#00639B</color>
+    <color name="accent_light">#D3E3FD</color>
+    <color name="status_green">#146C2E</color>
+    <color name="status_green_bg">#C4EDD0</color>
+    <color name="status_red">#BA1A1A</color>
+    <color name="status_amber">#B58300</color>
+    <color name="status_amber_bg">#FFF0C2</color>
+    <color name="bg_light">#F8F9FF</color>
+    <color name="text_dark">#191C1E</color>
+    <color name="text_muted">#74777F</color>
     <color name="white">#FFFFFF</color>
 </resources>

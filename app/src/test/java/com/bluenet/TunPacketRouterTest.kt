@@ -11,7 +11,7 @@ import java.io.PipedOutputStream
 class TunPacketRouterTest {
 
     @Test
-    fun testBuildIPv4TcpPacketHeader() {
+    fun testBuildTcpPacketHeader() {
         val pipeIn = PipedInputStream()
         val pipeOut = PipedOutputStream()
         val mux = StreamMultiplexer(pipeIn, pipeOut, {}, {})
@@ -21,8 +21,9 @@ class TunPacketRouterTest {
         val srcPort = 8080
         val dstPort = 443
         val payload = "HTTP/1.1 200 OK\r\n\r\n".toByteArray()
+        val key = TunPacketRouter.StreamKey(6.toByte(), srcIp, srcPort, dstPort)
 
-        val packet = router.buildIPv4Packet(protocol = 6, srcIp = srcIp, srcPort = srcPort, dstPort = dstPort, payload = payload)
+        val packet = router.buildTcpPacket(key = key, flags = 0x18, seq = 1000L, ack = 5000L, payload = payload)
 
         // IPv4 Header verification
         assertEquals(0x45.toByte(), packet[0]) // Version 4, IHL 5
@@ -57,7 +58,7 @@ class TunPacketRouterTest {
     }
 
     @Test
-    fun testBuildIPv4UdpPacketHeader() {
+    fun testBuildUdpPacketHeader() {
         val pipeIn = PipedInputStream()
         val pipeOut = PipedOutputStream()
         val mux = StreamMultiplexer(pipeIn, pipeOut, {}, {})
@@ -68,7 +69,7 @@ class TunPacketRouterTest {
         val dstPort = 54321
         val payload = byteArrayOf(1, 2, 3, 4, 5)
 
-        val packet = router.buildIPv4Packet(protocol = 17, srcIp = srcIp, srcPort = srcPort, dstPort = dstPort, payload = payload)
+        val packet = router.buildUdpPacket(srcIp = srcIp, srcPort = srcPort, dstPort = dstPort, payload = payload)
 
         // IPv4 Header verification
         assertEquals(0x45.toByte(), packet[0])
