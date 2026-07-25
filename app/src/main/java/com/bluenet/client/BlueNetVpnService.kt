@@ -38,7 +38,7 @@ class BlueNetVpnService : VpnService() {
     }
 
     @SuppressLint("MissingPermission")
-    fun connectToHost(deviceAddress: String, psm: Int, onStatusChanged: (String) -> Unit) {
+    fun connectToHost(deviceAddress: String, psm: Int, compatMode: Boolean = false, onStatusChanged: (String) -> Unit) {
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val bluetoothAdapter = bluetoothManager.adapter
         val device = bluetoothAdapter?.getRemoteDevice(deviceAddress)
@@ -48,21 +48,23 @@ class BlueNetVpnService : VpnService() {
             return
         }
 
-        onStatusChanged("Connecting L2CAP to $deviceAddress on PSM $psm...")
+        val modeDesc = if (compatMode) "RFCOMM Compat Mode" else "PSM $psm"
+        onStatusChanged("Connecting ($modeDesc) to $deviceAddress...")
 
         l2capClient = L2capClient(
+            context = this,
             device = device,
             psm = psm,
             onConnected = { socket ->
-                onStatusChanged("L2CAP Connected. Initializing VPN Tunnel...")
+                onStatusChanged("Bluetooth Connected. Initializing VPN Tunnel...")
                 setupVpnTunnel(socket.inputStream, socket.outputStream, onStatusChanged)
             },
             onError = { err ->
-                onStatusChanged("L2CAP Error: $err")
+                onStatusChanged(err)
                 stopVpn()
             }
         )
-        l2capClient?.connect()
+        l2capClient?.connect(compatMode)
     }
 
     private fun setupVpnTunnel(inputStream: java.io.InputStream, outputStream: java.io.OutputStream, onStatusChanged: (String) -> Unit) {

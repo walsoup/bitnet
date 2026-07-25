@@ -78,6 +78,9 @@ class StreamMultiplexer(
             while (isRunning.get()) {
                 val frame = Frame.readFrom(dis) ?: break
                 lastActivityTimestamp = System.currentTimeMillis()
+                if (frame.type == FrameType.KEEPALIVE) {
+                    continue
+                }
                 if (frame.type == FrameType.COMPRESSED_DATA) {
                     val decompressed = frame.decompressPayload()
                     val normalizedFrame = Frame(FrameType.DATA, frame.streamId, decompressed)

@@ -222,7 +222,8 @@ class MainActivity : AppCompatActivity() {
         val vpnIntent = Intent(this, BlueNetVpnService::class.java)
         startService(vpnIntent)
 
-        vpnService?.connectToHost(targetMac, psm) { statusText ->
+        val compatMode = binding.swCompatMode.isChecked
+        vpnService?.connectToHost(targetMac, psm, compatMode) { statusText ->
             runOnUiThread {
                 binding.tvClientStatus.text = statusText
                 updateClientUi()
@@ -235,7 +236,8 @@ class MainActivity : AppCompatActivity() {
         val isRunning = hostService?.isServerRunning == true
         if (isRunning) {
             binding.btnToggleHost.text = getString(R.string.btn_stop_host)
-            val channelMode = if (hostService?.l2capServer?.isUsingRfcommFallback == true) "RFCOMM High-Speed" else "L2CAP CoC"
+            val psm = hostService?.currentPsm ?: -1
+            val channelMode = if (psm > 0) "L2CAP CoC & RFCOMM Dual" else "RFCOMM High-Speed"
             binding.tvHostStatus.text = "Host Server Active ($channelMode)"
 
             // Show MAC address on Host Card
@@ -247,8 +249,7 @@ class MainActivity : AppCompatActivity() {
                 val displayAddress = if (mac != null && mac != "02:00:00:00:00:00") mac else deviceName
                 binding.tvHostMac.text = displayAddress
 
-                val psm = hostService?.currentPsm ?: -1
-                if (psm > 0 && channelMode == "L2CAP CoC") {
+                if (psm > 0) {
                     binding.tvHostPsm.text = "PSM: $psm"
                     binding.tvHostPsm.visibility = View.VISIBLE
                 } else {

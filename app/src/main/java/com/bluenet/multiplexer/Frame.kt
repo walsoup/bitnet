@@ -92,9 +92,16 @@ data class Frame(
         const val HEADER_SIZE = 8 // 1(Magic) + 1(Type) + 4(StreamId) + 2(Length)
 
         fun readFrom(dis: DataInputStream): Frame? {
-            val magic = dis.readByte()
-            if (magic != MAGIC) {
-                throw IOException("Invalid frame magic byte: $magic")
+            var magic: Byte
+            while (true) {
+                try {
+                    magic = dis.readByte()
+                } catch (_: java.io.EOFException) {
+                    return null
+                }
+                if (magic == MAGIC) {
+                    break
+                }
             }
             val typeByte = dis.readByte()
             val type = FrameType.fromCode(typeByte)

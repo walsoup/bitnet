@@ -244,6 +244,15 @@
                     android:background="@android:drawable/btn_dropdown"
                     android:layout_marginTop="8dp"/>
 
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/swCompatMode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Compatibility Mode (RFCOMM Force)"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnSurface"
+                    android:layout_marginTop="16dp"/>
+
                 <TextView
                     android:id="@+id/tvClientStatus"
                     android:layout_width="match_parent"
