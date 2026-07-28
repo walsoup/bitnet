@@ -25,7 +25,7 @@
             android:backgroundTint="?attr/colorPrimaryContainer"
             android:padding="12dp"
             android:src="@drawable/ic_bluetooth_client"
-            app:tint="?attr/onPrimaryContainer" />
+            app:tint="?attr/colorOnPrimaryContainer" />
 
         <LinearLayout
             android:layout_width="0dp"
