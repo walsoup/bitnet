@@ -285,9 +285,10 @@ class MainActivity : AppCompatActivity() {
         lastStatsTime = now
 
         val isSharing = meshService?.meshManager?.isSharingInternet?.value == true
-        if (isSharing && isHostBound) {
-            val currentTx = hostService?.getTxBytes() ?: 0L
-            val currentRx = hostService?.getRxBytes() ?: 0L
+        if (isSharing) {
+            val manager = meshService?.meshManager
+            val currentTx = manager?.getTxBytes() ?: 0L
+            val currentRx = manager?.getRxBytes() ?: 0L
             val txSpeed = maxOf(0L, ((currentTx - lastHostTx) / dt).toLong())
             val rxSpeed = maxOf(0L, ((currentRx - lastHostRx) / dt).toLong())
             lastHostTx = currentTx
@@ -298,7 +299,7 @@ class MainActivity : AppCompatActivity() {
             binding.tvShareRxSpeed.text = formatSpeed(rxSpeed)
             binding.tvShareRxTotal.text = "Total: ${formatBytes(currentRx)}"
             
-            val psm = hostService?.currentPsm ?: -1
+            val psm = manager?.currentPsm ?: -1
             if (psm > 0) {
                 binding.tvSharingPsm.text = getString(R.string.sharing_on_psm, psm)
             }

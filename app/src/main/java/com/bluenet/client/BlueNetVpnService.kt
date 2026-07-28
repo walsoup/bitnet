@@ -50,9 +50,22 @@ class BlueNetVpnService : VpnService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_DISCONNECT_VPN) {
-            stopVpn(userExplicit = true)
-            return START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_DISCONNECT_VPN -> {
+                stopVpn(userExplicit = true)
+                return START_NOT_STICKY
+            }
+            ACTION_CONNECT_VPN -> {
+                val mac = intent.getStringExtra(EXTRA_PEER_MAC) ?: ""
+                val psm = intent.getIntExtra(EXTRA_PEER_PSM, 1)
+                val compat = intent.getBooleanExtra(EXTRA_COMPAT_MODE, false)
+                if (mac.isNotEmpty()) {
+                    connectToHost(mac, psm, compat) { status ->
+                        Log.d(TAG, "VPN Status: $status")
+                    }
+                }
+                return START_STICKY
+            }
         }
         return super.onStartCommand(intent, flags, startId)
     }
@@ -72,12 +85,15 @@ class BlueNetVpnService : VpnService() {
         lastCompatMode = compatMode
         statusCallback = onStatusChanged
 
+        broadcastState(STATE_CONNECTING)
+
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val bluetoothAdapter = bluetoothManager.adapter
         val device = bluetoothAdapter?.getRemoteDevice(deviceAddress)
 
         if (device == null) {
             onStatusChanged("Device not found: $deviceAddress")
+            broadcastState(STATE_DISCONNECTED)
             return
         }
 
@@ -122,6 +138,7 @@ class BlueNetVpnService : VpnService() {
             statusCallback?.invoke(statusMsg)
             updateNotification(statusMsg)
             Log.d(TAG, statusMsg)
+            broadcastState(STATE_CONNECTING)
 
             cleanupSocketsOnly()
 
@@ -181,6 +198,7 @@ class BlueNetVpnService : VpnService() {
             reconnectAttempt = 0
             updateNotification("BlueNet VPN Connected & Tunneling Traffic")
             onStatusChanged("Connected! Speed-optimized L2CAP Tethering Active")
+            broadcastState(STATE_CONNECTED)
             Log.d(TAG, "VPN Tunnel established over L2CAP")
         } catch (e: Exception) {
             Log.e(TAG, "Error setting up VPN tunnel", e)
@@ -219,9 +237,19 @@ class BlueNetVpnService : VpnService() {
 
         cleanupSocketsOnly()
 
+        broadcastState(STATE_DISCONNECTED)
+
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
         Log.d(TAG, "BlueNetVpnService stopped (userExplicit=$userExplicit)")
+    }
+
+    private fun broadcastState(state: String) {
+        val intent = Intent(ACTION_VPN_STATE_CHANGED).apply {
+            putExtra(EXTRA_STATE, state)
+            setPackage(packageName)
+        }
+        sendBroadcast(intent)
     }
 
     private fun createNotificationChannel() {
@@ -277,6 +305,18 @@ class BlueNetVpnService : VpnService() {
         private const val CHANNEL_ID = "bluenet_vpn_channel"
         private const val NOTIFICATION_ID = 2002
         private const val MAX_RECONNECT_ATTEMPTS = 5
+
+        const val ACTION_CONNECT_VPN = "com.bluenet.ACTION_CONNECT_VPN"
         const val ACTION_DISCONNECT_VPN = "com.bluenet.ACTION_DISCONNECT_VPN"
+        const val ACTION_VPN_STATE_CHANGED = "com.bluenet.ACTION_VPN_STATE_CHANGED"
+
+        const val EXTRA_PEER_MAC = "extra_peer_mac"
+        const val EXTRA_PEER_PSM = "extra_peer_psm"
+        const val EXTRA_COMPAT_MODE = "extra_compat_mode"
+        const val EXTRA_STATE = "extra_state"
+
+        const val STATE_CONNECTING = "CONNECTING"
+        const val STATE_CONNECTED = "CONNECTED"
+        const val STATE_DISCONNECTED = "DISCONNECTED"
     }
 }

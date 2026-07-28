@@ -2,13 +2,13 @@ package com.bluenet.mesh
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
-import com.bluenet.bluetooth.L2capClient
 import com.bluenet.bluetooth.L2capServer
 import com.bluenet.client.BlueNetVpnService
 import com.bluenet.host.HostProxyManager
@@ -50,24 +50,57 @@ class MeshManager(private val context: Context, private val bluetoothAdapter: Bl
     var currentPsm: Int = -1
         private set
 
-    // Client-side (consuming) components
-    private var l2capClient: L2capClient? = null
-
     // Callbacks for status forwarding
     var onSharingStatusChanged: ((String, Int) -> Unit)? = null
 
+    private val vpnStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == BlueNetVpnService.ACTION_VPN_STATE_CHANGED) {
+                when (intent.getStringExtra(BlueNetVpnService.EXTRA_STATE)) {
+                    BlueNetVpnService.STATE_CONNECTING -> {
+                        _connectionState.value = ConnectionState.CONNECTING
+                    }
+                    BlueNetVpnService.STATE_CONNECTED -> {
+                        _connectionState.value = ConnectionState.CONNECTED
+                    }
+                    BlueNetVpnService.STATE_DISCONNECTED -> {
+                        _connectionState.value = ConnectionState.DISCONNECTED
+                        _connectedPeer.value = null
+                    }
+                }
+            }
+        }
+    }
+
+    private var isReceiverRegistered = false
+
     fun start(peerId: String, displayName: String) {
+        if (!isReceiverRegistered) {
+            val filter = IntentFilter(BlueNetVpnService.ACTION_VPN_STATE_CHANGED)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(vpnStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                context.registerReceiver(vpnStateReceiver, filter)
+            }
+            isReceiverRegistered = true
+        }
+
         val isSharing = _isSharingInternet.value
         advertiser.start(peerId, displayName, isSharing, currentPsm)
         scanner.start()
 
-        // If sharing was previously enabled, restart the host server
         if (isSharing) {
             startHostServer()
         }
     }
 
     fun stop() {
+        if (isReceiverRegistered) {
+            try {
+                context.unregisterReceiver(vpnStateReceiver)
+            } catch (_: Exception) {}
+            isReceiverRegistered = false
+        }
         advertiser.stop()
         scanner.stop()
         stopHostServer()
@@ -88,14 +121,13 @@ class MeshManager(private val context: Context, private val bluetoothAdapter: Bl
 
     @SuppressLint("MissingPermission")
     private fun startHostServer() {
-        if (l2capServer != null) return // Already running
+        if (l2capServer != null) return
 
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
             Log.w(TAG, "Cannot start host server: Bluetooth disabled")
             return
         }
 
-        // Start HostService for foreground notification
         val hostIntent = Intent(context, HostService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             ContextCompat.startForegroundService(context, hostIntent)
@@ -132,7 +164,6 @@ class MeshManager(private val context: Context, private val bluetoothAdapter: Bl
         if (success) {
             currentPsm = l2capServer?.psm ?: -1
             Log.d(TAG, "Host server started on PSM: $currentPsm")
-            // Update advertisement with new PSM
             advertiser.updateAdvertisement(true, currentPsm)
             onSharingStatusChanged?.invoke("Sharing on PSM: $currentPsm", currentPsm)
         } else {
@@ -152,6 +183,11 @@ class MeshManager(private val context: Context, private val bluetoothAdapter: Bl
         l2capServer = null
         currentPsm = -1
         advertiser.updateAdvertisement(false, 0)
+
+        val stopHostIntent = Intent(context, HostService::class.java).apply {
+            action = HostService.ACTION_STOP_HOST
+        }
+        context.startService(stopHostIntent)
     }
 
     fun getTxBytes(): Long = activeMultiplexer?.getTxBytes() ?: 0L
@@ -172,43 +208,15 @@ class MeshManager(private val context: Context, private val bluetoothAdapter: Bl
         _connectionState.value = ConnectionState.CONNECTING
         _connectedPeer.value = peer
 
-        val device = bluetoothAdapter.getRemoteDevice(peer.macAddress)
-        if (device == null) {
-            Log.e(TAG, "Device not found: ${peer.macAddress}")
-            _connectionState.value = ConnectionState.DISCONNECTED
-            _connectedPeer.value = null
-            return
-        }
-
         PreferencesManager.saveLastConnectedPeerId(context, peer.peerId)
         PreferencesManager.saveClientConnection(context, peer.macAddress, peer.psm, false)
 
-        // Start VPN service
-        val vpnIntent = Intent(context, BlueNetVpnService::class.java)
+        val vpnIntent = Intent(context, BlueNetVpnService::class.java).apply {
+            action = BlueNetVpnService.ACTION_CONNECT_VPN
+            putExtra(BlueNetVpnService.EXTRA_PEER_MAC, peer.macAddress)
+            putExtra(BlueNetVpnService.EXTRA_PEER_PSM, peer.psm)
+        }
         ContextCompat.startForegroundService(context, vpnIntent)
-
-        l2capClient = L2capClient(
-            context = context,
-            device = device,
-            psm = peer.psm,
-            onConnected = { socket ->
-                Log.d(TAG, "Connected to peer ${peer.displayName} at ${peer.macAddress}")
-                _connectionState.value = ConnectionState.CONNECTED
-
-                // The VpnService will set up the TUN tunnel using the connected socket
-                // We send a connectToHost call to the VPN service with the peer's details
-                val vpnService = Intent(context, BlueNetVpnService::class.java)
-                vpnService.putExtra("peer_mac", peer.macAddress)
-                vpnService.putExtra("peer_psm", peer.psm)
-                context.startService(vpnService)
-            },
-            onError = { err ->
-                Log.e(TAG, "Connection to peer failed: $err")
-                _connectionState.value = ConnectionState.DISCONNECTED
-                _connectedPeer.value = null
-            }
-        )
-        l2capClient?.connect(false)
     }
 
     fun disconnect() {
@@ -218,10 +226,6 @@ class MeshManager(private val context: Context, private val bluetoothAdapter: Bl
     }
 
     private fun disconnectInternal() {
-        l2capClient?.disconnect()
-        l2capClient = null
-
-        // Stop VPN service
         val vpnIntent = Intent(context, BlueNetVpnService::class.java).apply {
             action = BlueNetVpnService.ACTION_DISCONNECT_VPN
         }

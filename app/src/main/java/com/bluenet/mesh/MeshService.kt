@@ -32,7 +32,7 @@ class MeshService : Service() {
 
     companion object {
         const val ACTION_STOP_MESH = "com.bluenet.mesh.ACTION_STOP_MESH"
-        private const val NOTIFICATION_ID = 1001
+        private const val NOTIFICATION_ID = 1003
         private const val CHANNEL_ID = "bluenet_mesh_channel"
     }
 
