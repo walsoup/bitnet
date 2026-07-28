@@ -13,10 +13,13 @@ import android.util.Log
 class MeshAdvertiser(private val bluetoothAdapter: BluetoothAdapter?) {
     private val TAG = "MeshAdvertiser"
     private var advertiser: BluetoothLeAdvertiser? = null
-    private var isAdvertising = false
+    var isAdvertising = false
+        private set
 
     private var currentPeerId = ""
     private var currentDisplayName = ""
+    private var currentIsSharingInternet = false
+    private var currentPsm = 0
 
     private val advertiseCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
@@ -31,16 +34,19 @@ class MeshAdvertiser(private val bluetoothAdapter: BluetoothAdapter?) {
     }
 
     fun start(peerId: String, displayName: String, isSharingInternet: Boolean, psm: Int) {
-        if (isAdvertising) stop()
+        stop()
+
+        currentPeerId = peerId
+        currentDisplayName = displayName
+        currentIsSharingInternet = isSharingInternet
+        currentPsm = psm
 
         advertiser = bluetoothAdapter?.bluetoothLeAdvertiser
         if (advertiser == null) {
             Log.e(TAG, "BluetoothLeAdvertiser is null")
+            isAdvertising = false
             return
         }
-
-        currentPeerId = peerId
-        currentDisplayName = displayName
 
         val settings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
@@ -57,34 +63,39 @@ class MeshAdvertiser(private val bluetoothAdapter: BluetoothAdapter?) {
             displayName = displayName
         )
 
-        val data = AdvertiseData.Builder()
+        val advertiseData = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .setIncludeTxPowerLevel(false)
             .addServiceUuid(ParcelUuid(MeshConstants.MESH_SERVICE_UUID))
+            .build()
+
+        val scanResponseData = AdvertiseData.Builder()
+            .setIncludeDeviceName(false)
+            .setIncludeTxPowerLevel(false)
             .addManufacturerData(MeshConstants.MANUFACTURER_ID, announcement.toBytes())
             .build()
 
         try {
-            advertiser?.startAdvertising(settings, data, advertiseCallback)
+            advertiser?.startAdvertising(settings, advertiseData, scanResponseData, advertiseCallback)
+            isAdvertising = true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start advertising", e)
+            isAdvertising = false
         }
     }
 
     fun stop() {
-        if (isAdvertising) {
-            try {
-                advertiser?.stopAdvertising(advertiseCallback)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to stop advertising", e)
-            }
-            isAdvertising = false
-            Log.d(TAG, "Advertising stopped")
+        try {
+            advertiser?.stopAdvertising(advertiseCallback)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to stop advertising", e)
         }
+        isAdvertising = false
+        Log.d(TAG, "Advertising stopped")
     }
 
     fun updateAdvertisement(isSharingInternet: Boolean, psm: Int) {
-        if (isAdvertising) {
+        if (currentPeerId.isNotEmpty()) {
             start(currentPeerId, currentDisplayName, isSharingInternet, psm)
         }
     }

@@ -15,6 +15,8 @@ import com.bluenet.host.HostProxyManager
 import com.bluenet.host.HostService
 import com.bluenet.multiplexer.StreamMultiplexer
 import com.bluenet.utils.PreferencesManager
+import com.bluenet.messaging.MessageStore
+import com.bluenet.messaging.MeshRouter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +35,39 @@ class MeshManager(private val context: Context, private val bluetoothAdapter: Bl
     private val scanner = MeshScanner(bluetoothAdapter)
 
     val peers: StateFlow<List<MeshPeer>> = scanner.peers
+
+    val messageStore = MessageStore()
+
+    private var meshPacketListener: ((ByteArray, String) -> Unit)? = null
+
+    val meshTransport = object : MeshTransport {
+        override fun sendPacket(data: ByteArray, targetPeerId: String?): Boolean {
+            return broadcastPacket(data)
+        }
+
+        override fun broadcastPacket(data: ByteArray): Boolean {
+            return true
+        }
+
+        override fun setPacketListener(listener: (ByteArray, String) -> Unit) {
+            meshPacketListener = listener
+        }
+
+        override fun getConnectedPeers(): List<String> {
+            return scanner.peers.value.map { it.peerId }
+        }
+    }
+
+    var meshRouter: MeshRouter = MeshRouter(
+        localPeerId = "",
+        messageStore = messageStore,
+        transport = meshTransport
+    )
+        private set
+
+    fun onIncomingMeshPacket(data: ByteArray, fromPeerId: String) {
+        meshPacketListener?.invoke(data, fromPeerId) ?: meshRouter.processIncomingBytes(data, fromPeerId)
+    }
 
     private val _isSharingInternet = MutableStateFlow(PreferencesManager.isSharingInternet(context))
     val isSharingInternet: StateFlow<Boolean> = _isSharingInternet.asStateFlow()
@@ -75,6 +110,12 @@ class MeshManager(private val context: Context, private val bluetoothAdapter: Bl
     private var isReceiverRegistered = false
 
     fun start(peerId: String, displayName: String) {
+        meshRouter = MeshRouter(
+            localPeerId = peerId,
+            messageStore = messageStore,
+            transport = meshTransport
+        )
+
         if (!isReceiverRegistered) {
             val filter = IntentFilter(BlueNetVpnService.ACTION_VPN_STATE_CHANGED)
             ContextCompat.registerReceiver(
@@ -88,7 +129,7 @@ class MeshManager(private val context: Context, private val bluetoothAdapter: Bl
 
         val isSharing = _isSharingInternet.value
         advertiser.start(peerId, displayName, isSharing, currentPsm)
-        scanner.start()
+        scanner.start(peerId)
 
         if (isSharing) {
             startHostServer()

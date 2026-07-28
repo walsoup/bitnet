@@ -55,6 +55,7 @@ class MainActivity : AppCompatActivity() {
             meshService = binder.getService()
             isMeshBound = true
             observeMeshState()
+            restartMeshService()
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -122,10 +123,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerView() {
-        peerAdapter = MeshPeerAdapter { peer ->
-            triggerHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
-            connectToPeer(peer)
-        }
+        peerAdapter = MeshPeerAdapter(
+            onConnectClicked = { peer ->
+                triggerHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                connectToPeer(peer)
+            },
+            onChatClicked = { peer ->
+                triggerHaptic(HapticFeedbackConstants.CONTEXT_CLICK)
+                val intent = Intent(this, ChatActivity::class.java).apply {
+                    putExtra(ChatActivity.EXTRA_PEER_ID, peer.peerId)
+                    putExtra(ChatActivity.EXTRA_PEER_NAME, peer.displayName)
+                }
+                startActivity(intent)
+            }
+        )
         binding.rvPeers.layoutManager = LinearLayoutManager(this)
         binding.rvPeers.adapter = peerAdapter
     }
@@ -230,6 +241,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val bluetoothPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissionsMap ->
+        if (permissionsMap.values.any { it }) {
+            restartMeshService()
+        }
+    }
+
     private fun requestBluetoothPermissions() {
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -249,8 +268,27 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (missing.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, missing.toTypedArray(), 100)
+            bluetoothPermissionLauncher.launch(missing.toTypedArray())
+        } else {
+            restartMeshService()
         }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 100 && grantResults.any { it == PackageManager.PERMISSION_GRANTED }) {
+            restartMeshService()
+        }
+    }
+
+    private fun restartMeshService() {
+        val peerId = com.bluenet.utils.PreferencesManager.getPeerId(this)
+        val displayName = com.bluenet.utils.PreferencesManager.getDisplayName(this)
+        meshService?.meshManager?.start(peerId, displayName)
     }
 
     private val statsHandler = android.os.Handler(android.os.Looper.getMainLooper())

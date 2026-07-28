@@ -15,6 +15,8 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.bluenet.utils.PreferencesManager
+import com.bluenet.messaging.MessageStore
+import com.bluenet.messaging.MeshRouter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -31,6 +33,9 @@ class MeshService : Service() {
     private var peerId: String = ""
     private var displayName: String = ""
 
+    val meshRouter: MeshRouter get() = meshManager.meshRouter
+    val messageStore: MessageStore get() = meshManager.messageStore
+
     companion object {
         const val ACTION_STOP_MESH = "com.bluenet.mesh.ACTION_STOP_MESH"
         private const val NOTIFICATION_ID = 1003
@@ -40,6 +45,8 @@ class MeshService : Service() {
     inner class MeshBinder : Binder() {
         fun getService(): MeshService = this@MeshService
         fun getManager(): MeshManager = meshManager
+        fun getRouter(): MeshRouter = meshManager.meshRouter
+        fun getMessageStore(): MessageStore = meshManager.messageStore
     }
 
     override fun onCreate() {

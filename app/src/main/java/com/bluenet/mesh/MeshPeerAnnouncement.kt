@@ -13,10 +13,25 @@ data class MeshPeerAnnouncement(
 ) {
     fun toBytes(): ByteArray {
         val nameBytes = if (hasName && displayName != null) {
-            val bytes = displayName.toByteArray(StandardCharsets.UTF_8)
-            if (bytes.size > MeshConstants.MAX_DISPLAY_NAME_LENGTH) {
-                bytes.copyOfRange(0, MeshConstants.MAX_DISPLAY_NAME_LENGTH)
-            } else bytes
+            val fullBytes = displayName.toByteArray(StandardCharsets.UTF_8)
+            if (fullBytes.size > MeshConstants.MAX_DISPLAY_NAME_LENGTH) {
+                var byteLength = 0
+                var validCharLength = 0
+                var i = 0
+                while (i < displayName.length) {
+                    val codePoint = displayName.codePointAt(i)
+                    val charCount = Character.charCount(codePoint)
+                    val str = displayName.substring(i, i + charCount)
+                    val bytes = str.toByteArray(StandardCharsets.UTF_8)
+                    if (byteLength + bytes.size > MeshConstants.MAX_DISPLAY_NAME_LENGTH) {
+                        break
+                    }
+                    byteLength += bytes.size
+                    validCharLength += charCount
+                    i += charCount
+                }
+                displayName.substring(0, validCharLength).toByteArray(StandardCharsets.UTF_8)
+            } else fullBytes
         } else ByteArray(0)
 
         val bufferSize = 1 + 8 + 1 + (if (isSharingInternet) 2 else 0) + nameBytes.size
@@ -24,15 +39,15 @@ data class MeshPeerAnnouncement(
         
         buffer.put(protocolVersion)
         
-        // Convert peerId (hex string) to exactly 8 bytes
-        val peerIdBytes = peerId.chunked(2).map { it.toIntOrNull(16)?.toByte() ?: 0 }.toByteArray()
+        // Convert peerId (hex string) to byte array padded to 8 bytes
+        val peerIdBytes = peerId.chunked(2).mapNotNull { it.toIntOrNull(16)?.toByte() }.toByteArray()
         val paddedPeerId = ByteArray(8)
         System.arraycopy(peerIdBytes, 0, paddedPeerId, 0, minOf(peerIdBytes.size, 8))
         buffer.put(paddedPeerId)
         
         var flags = 0
         if (isSharingInternet) flags = flags or 0x01
-        if (hasName) flags = flags or 0x02
+        if (hasName && nameBytes.isNotEmpty()) flags = flags or 0x02
         buffer.put(flags.toByte())
         
         if (isSharingInternet) {
@@ -57,7 +72,9 @@ data class MeshPeerAnnouncement(
                 
                 val peerIdBytes = ByteArray(8)
                 buffer.get(peerIdBytes)
-                val peerId = peerIdBytes.joinToString("") { "%02x".format(it) }
+                val hexList = peerIdBytes.map { "%02x".format(it.toInt() and 0xFF) }
+                val lastNonZero = hexList.indexOfLast { it != "00" }
+                val peerId = if (lastNonZero < 0) hexList.joinToString("") else hexList.take(lastNonZero + 1).joinToString("")
                 
                 val flags = buffer.get().toInt()
                 val isSharingInternet = (flags and 0x01) != 0
@@ -67,6 +84,7 @@ data class MeshPeerAnnouncement(
                 if (isSharingInternet) {
                     if (buffer.remaining() < 2) return null
                     psm = buffer.short.toInt() and 0xFFFF
+                    if (psm <= 0 || psm > 65535) return null
                 }
                 
                 var displayName: String? = null

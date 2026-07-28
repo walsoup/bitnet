@@ -11,7 +11,8 @@ import com.bluenet.databinding.ItemMeshPeerBinding
 import com.bluenet.mesh.MeshPeer
 
 class MeshPeerAdapter(
-    private val onConnectClicked: (MeshPeer) -> Unit
+    private val onConnectClicked: (MeshPeer) -> Unit,
+    private val onChatClicked: (MeshPeer) -> Unit
 ) : ListAdapter<MeshPeer, MeshPeerAdapter.PeerViewHolder>(DiffCallback) {
 
     inner class PeerViewHolder(private val binding: ItemMeshPeerBinding) : RecyclerView.ViewHolder(binding.root) {
@@ -35,6 +36,9 @@ class MeshPeerAdapter(
 
             binding.btnConnectPeer.setOnClickListener {
                 onConnectClicked(peer)
+            }
+            binding.btnChatPeer.setOnClickListener {
+                onChatClicked(peer)
             }
         }
     }

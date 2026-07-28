@@ -64,6 +64,14 @@
         </LinearLayout>
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnChatPeer"
+            style="?attr/materialButtonText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:text="Chat" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnConnectPeer"
             style="?attr/materialButtonOutlinedStyle"
             android:layout_width="wrap_content"

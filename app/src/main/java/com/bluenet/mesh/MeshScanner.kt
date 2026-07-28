@@ -36,25 +36,15 @@ class MeshScanner(private val bluetoothAdapter: BluetoothAdapter?) {
         }
     }
 
+    private var localPeerId: String = ""
+
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
-            val record = result.scanRecord ?: return
-            val manufacturerData = record.getManufacturerSpecificData(MeshConstants.MANUFACTURER_ID) ?: return
+            processScanResult(result)
+        }
 
-            val announcement = MeshPeerAnnouncement.fromBytes(manufacturerData) ?: return
-
-            val peer = MeshPeer(
-                peerId = announcement.peerId,
-                displayName = announcement.displayName ?: "Unknown",
-                macAddress = result.device.address,
-                isSharingInternet = announcement.isSharingInternet,
-                signalStrength = result.rssi,
-                lastSeen = System.currentTimeMillis(),
-                psm = announcement.psm
-            )
-
-            _peersMap[peer.peerId] = peer
-            updatePeersList()
+        override fun onBatchScanResults(results: MutableList<ScanResult>?) {
+            results?.forEach { processScanResult(it) }
         }
 
         override fun onScanFailed(errorCode: Int) {
@@ -62,7 +52,34 @@ class MeshScanner(private val bluetoothAdapter: BluetoothAdapter?) {
         }
     }
 
-    fun start() {
+    fun processScanResult(result: ScanResult) {
+        val record = result.scanRecord ?: return
+        val manufacturerData = record.getManufacturerSpecificData(MeshConstants.MANUFACTURER_ID) ?: return
+
+        val announcement = MeshPeerAnnouncement.fromBytes(manufacturerData) ?: return
+
+        if (localPeerId.isNotEmpty() && announcement.peerId == localPeerId) {
+            return
+        }
+
+        val peer = MeshPeer(
+            peerId = announcement.peerId,
+            displayName = announcement.displayName ?: "Unknown",
+            macAddress = result.device?.address ?: "",
+            isSharingInternet = announcement.isSharingInternet,
+            signalStrength = result.rssi,
+            lastSeen = System.currentTimeMillis(),
+            psm = announcement.psm
+        )
+
+        _peersMap[peer.peerId] = peer
+        updatePeersList()
+    }
+
+    fun start(peerId: String = "") {
+        if (peerId.isNotEmpty()) {
+            localPeerId = peerId
+        }
         if (isScanning) return
         
         scanner = bluetoothAdapter?.bluetoothLeScanner
@@ -102,7 +119,7 @@ class MeshScanner(private val bluetoothAdapter: BluetoothAdapter?) {
         }
     }
 
-    private fun cleanupStalePeers() {
+    fun cleanupStalePeers() {
         val now = System.currentTimeMillis()
         var changed = false
         val iterator = _peersMap.entries.iterator()
@@ -119,6 +136,8 @@ class MeshScanner(private val bluetoothAdapter: BluetoothAdapter?) {
     }
 
     private fun updatePeersList() {
+        val now = System.currentTimeMillis()
+        _peersMap.entries.removeIf { now - it.value.lastSeen > MeshConstants.PEER_TIMEOUT_MS }
         val sortedList = _peersMap.values.sortedWith(
             compareByDescending<MeshPeer> { it.isSharingInternet }
                 .thenByDescending { it.signalStrength }
