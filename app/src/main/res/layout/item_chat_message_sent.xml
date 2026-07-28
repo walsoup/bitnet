@@ -11,10 +11,11 @@
         android:id="@+id/cardMessage"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="start"
+        android:layout_gravity="end"
         android:layout_margin="4dp"
         app:cardCornerRadius="12dp"
-        app:cardElevation="1dp">
+        app:cardElevation="1dp"
+        app:cardBackgroundColor="?attr/colorPrimaryContainer">
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -23,20 +24,10 @@
             android:padding="8dp">
 
             <TextView
-                android:id="@+id/tvSender"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="?attr/colorPrimary"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                tools:text="Sender Name" />
-
-            <TextView
                 android:id="@+id/tvBody"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:textColor="?attr/colorOnSurface"
+                android:textColor="?attr/colorOnPrimaryContainer"
                 android:textSize="16sp"
                 tools:text="This is a test message" />
 
@@ -46,7 +37,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="end"
                 android:layout_marginTop="2dp"
-                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textColor="?attr/colorOnPrimaryContainer"
                 android:textSize="10sp"
                 tools:text="12:00 PM" />
         </LinearLayout>

@@ -1,12 +1,9 @@
 package com.bluenet.utils
 
-import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.cardview.widget.CardView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -16,49 +13,58 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class ChatAdapter(private val localPeerId: String) : ListAdapter<ChatMessage, ChatAdapter.ChatViewHolder>(ChatDiffCallback()) {
+class ChatAdapter(private val localPeerId: String) : ListAdapter<ChatMessage, RecyclerView.ViewHolder>(ChatDiffCallback()) {
+
+    companion object {
+        private const val VIEW_TYPE_SENT = 1
+        private const val VIEW_TYPE_RECEIVED = 2
+    }
 
     private val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_chat_message, parent, false)
-        return ChatViewHolder(view)
+    override fun getItemViewType(position: Int): Int {
+        val message = getItem(position)
+        return if (message.senderId == localPeerId) VIEW_TYPE_SENT else VIEW_TYPE_RECEIVED
     }
 
-    override fun onBindViewHolder(holder: ChatViewHolder, position: Int) {
-        holder.bind(getItem(position))
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        return if (viewType == VIEW_TYPE_SENT) {
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_chat_message_sent, parent, false)
+            SentViewHolder(view)
+        } else {
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_chat_message_received, parent, false)
+            ReceivedViewHolder(view)
+        }
     }
 
-    inner class ChatViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val cardMessage: CardView = itemView.findViewById(R.id.cardMessage)
-        private val tvSender: TextView = itemView.findViewById(R.id.tvSender)
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        val message = getItem(position)
+        if (holder is SentViewHolder) {
+            holder.bind(message)
+        } else if (holder is ReceivedViewHolder) {
+            holder.bind(message)
+        }
+    }
+
+    inner class SentViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val tvBody: TextView = itemView.findViewById(R.id.tvBody)
         private val tvTime: TextView = itemView.findViewById(R.id.tvTime)
 
         fun bind(message: ChatMessage) {
             tvBody.text = message.content
             tvTime.text = timeFormat.format(Date(message.timestamp))
+        }
+    }
 
-            val isMine = message.senderId == localPeerId
+    inner class ReceivedViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val tvSender: TextView = itemView.findViewById(R.id.tvSender)
+        private val tvBody: TextView = itemView.findViewById(R.id.tvBody)
+        private val tvTime: TextView = itemView.findViewById(R.id.tvTime)
 
-            if (isMine) {
-                tvSender.visibility = View.GONE
-                cardMessage.setCardBackgroundColor(itemView.context.getColor(R.color.colorPrimaryContainer))
-                tvBody.setTextColor(itemView.context.getColor(R.color.colorOnPrimaryContainer))
-                tvTime.setTextColor(itemView.context.getColor(R.color.colorOnPrimaryContainer))
-                val layoutParams = cardMessage.layoutParams as LinearLayout.LayoutParams
-                layoutParams.gravity = Gravity.END
-                cardMessage.layoutParams = layoutParams
-            } else {
-                tvSender.visibility = View.VISIBLE
-                tvSender.text = message.senderNickname
-                cardMessage.setCardBackgroundColor(itemView.context.getColor(R.color.colorSurfaceVariant))
-                tvBody.setTextColor(itemView.context.getColor(R.color.colorOnSurfaceVariant))
-                tvTime.setTextColor(itemView.context.getColor(R.color.colorOnSurfaceVariant))
-                val layoutParams = cardMessage.layoutParams as LinearLayout.LayoutParams
-                layoutParams.gravity = Gravity.START
-                cardMessage.layoutParams = layoutParams
-            }
+        fun bind(message: ChatMessage) {
+            tvSender.text = message.senderNickname
+            tvBody.text = message.content
+            tvTime.text = timeFormat.format(Date(message.timestamp))
         }
     }
 
