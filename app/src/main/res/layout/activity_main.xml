@@ -3,25 +3,85 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/android:colorBackground"
-    android:clipToPadding="false"
-    android:padding="16dp">
+    android:padding="16dp"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- App Header & Main Status Bar -->
+        <!-- Header Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
             app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:cardBackgroundColor="?attr/colorSurface">
+            style="?attr/materialCardViewOutlinedStyle">
+            
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:gravity="center">
+
+                <ImageView
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:src="@drawable/ic_bluetooth_host"
+                    app:tint="?attr/colorPrimary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/app_name"
+                    android:textAppearance="?attr/textAppearanceHeadlineMedium"
+                    android:textStyle="bold"
+                    android:layout_marginTop="8dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/app_tagline"
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:background="@drawable/bg_status_chip"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="8dp"
+                    android:layout_marginTop="16dp"
+                    android:gravity="center_vertical">
+
+                    <ImageView
+                        android:id="@+id/ivStatusDot"
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
+                        android:src="@drawable/ic_status_active"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/tvGlobalStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/status_offline"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Share My Internet Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardCornerRadius="20dp"
+            style="?attr/materialCardViewOutlinedStyle">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -35,703 +95,189 @@
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
 
-                    <com.google.android.material.imageview.ShapeableImageView
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:src="@drawable/ic_bluetooth_host"
-                        android:background="?attr/colorPrimaryContainer"
-                        android:padding="10dp"
-                        app:tint="?attr/colorOnPrimaryContainer"
-                        app:shapeAppearanceOverlay="?attr/shapeAppearanceCornerLarge"
-                        android:contentDescription="App Logo" />
-
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:layout_marginStart="14dp">
+                        android:orientation="vertical">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/app_name"
+                            android:text="@string/share_internet_title"
                             android:textAppearance="?attr/textAppearanceTitleLarge"
-                            android:textStyle="bold"
-                            android:textColor="?attr/colorOnSurface"/>
+                            android:textStyle="bold" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/app_tagline"
+                            android:text="@string/share_internet_subtitle"
                             android:textAppearance="?attr/textAppearanceBodyMedium"
-                            android:textColor="?attr/colorOnSurfaceVariant"/>
+                            android:textColor="?attr/colorOnSurfaceVariant" />
                     </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/swShareInternet"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
                 </LinearLayout>
 
-                <!-- Status Chip Banner -->
+                <!-- Sharing Stats Sub-card -->
                 <LinearLayout
-                    android:id="@+id/layoutGlobalStatus"
+                    android:id="@+id/layoutSharingStats"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:background="@drawable/bg_status_chip"
-                    android:paddingHorizontal="14dp"
-                    android:paddingVertical="10dp"
-                    android:layout_marginTop="12dp">
-
-                    <ImageView
-                        android:id="@+id/ivStatusDot"
-                        android:layout_width="12dp"
-                        android:layout_height="12dp"
-                        android:src="@drawable/ic_status_active"
-                        app:tint="@color/text_muted"
-                        android:contentDescription="Status Indicator" />
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:layout_marginTop="16dp">
 
                     <TextView
-                        android:id="@+id/tvGlobalStatus"
-                        android:layout_width="0dp"
+                        android:id="@+id/tvSharingPsm"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="10dp"
-                        android:text="@string/status_offline"
-                        android:textAppearance="?attr/textAppearanceLabelLarge"
-                        android:textStyle="bold"
-                        android:textColor="?attr/colorOnSurfaceVariant"/>
+                        android:layout_marginBottom="8dp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+                        <!-- TX -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView android:text="@string/traffic_tx" android:textAppearance="?attr/textAppearanceLabelMedium" android:textColor="?attr/colorOnSurfaceVariant" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                            <TextView android:id="@+id/tvShareTxSpeed" android:text="0 B/s" android:textAppearance="?attr/textAppearanceTitleMedium" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                            <TextView android:id="@+id/tvShareTxTotal" android:text="Total: 0 B" android:textAppearance="?attr/textAppearanceBodySmall" android:textColor="?attr/colorOnSurfaceVariant" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                        </LinearLayout>
+                        <!-- RX -->
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView android:text="@string/traffic_rx" android:textAppearance="?attr/textAppearanceLabelMedium" android:textColor="?attr/colorOnSurfaceVariant" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                            <TextView android:id="@+id/tvShareRxSpeed" android:text="0 B/s" android:textAppearance="?attr/textAppearanceTitleMedium" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                            <TextView android:id="@+id/tvShareRxTotal" android:text="Total: 0 B" android:textAppearance="?attr/textAppearanceBodySmall" android:textColor="?attr/colorOnSurfaceVariant" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                        </LinearLayout>
+                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Segmented Mode Selector Toggle -->
-        <com.google.android.material.button.MaterialButtonToggleGroup
-            android:id="@+id/rgModeSelector"
+        <!-- Connection Status Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardConnectionStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:singleSelection="true"
-            app:selectionRequired="true"
-            app:checkedButton="@+id/btnClientMode">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnClientMode"
-                android:layout_width="0dp"
-                android:layout_height="52dp"
-                android:layout_weight="1"
-                android:text="@string/tab_client"
-                app:icon="@drawable/ic_bluetooth_client"
-                app:iconGravity="textStart"
-                style="?attr/materialButtonOutlinedStyle"/>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnHostMode"
-                android:layout_width="0dp"
-                android:layout_height="52dp"
-                android:layout_weight="1"
-                android:text="@string/tab_host"
-                app:icon="@drawable/ic_bluetooth_host"
-                app:iconGravity="textStart"
-                style="?attr/materialButtonOutlinedStyle"/>
-        </com.google.android.material.button.MaterialButtonToggleGroup>
-
-        <!-- HOST PANEL -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardHost"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
             android:visibility="gone"
             app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:cardBackgroundColor="?attr/colorSurface">
-
+            style="?attr/materialCardViewOutlinedStyle"
+            app:strokeColor="?attr/colorPrimary">
+            
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="16dp">
 
                 <TextView
+                    android:id="@+id/tvConnectedPeerName"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Host Mode (Tether Provider)"
-                    android:textAppearance="?attr/textAppearanceTitleMedium"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorPrimary"/>
+                    android:textAppearance="?attr/textAppearanceTitleLarge"
+                    android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/tvConnectedPeerAddress"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Share your mobile network connection over high-speed Bluetooth."
-                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
                     android:textColor="?attr/colorOnSurfaceVariant"
-                    android:layout_marginTop="2dp"/>
+                    android:layout_marginBottom="16dp" />
 
-                <!-- Host Info Box with Copy Button -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/layoutMacContainer"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:cardBackgroundColor="?attr/colorSecondaryContainer"
-                    app:cardElevation="0dp"
-                    app:cardCornerRadius="16dp"
-                    android:visibility="gone"
-                    android:layout_marginTop="16dp">
-
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="16dp">
+                    <!-- TX -->
                     <LinearLayout
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="16dp">
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/host_mac_label"
-                                android:textAppearance="?attr/textAppearanceLabelMedium"
-                                android:textColor="?attr/colorOnSecondaryContainer"/>
-
-                            <TextView
-                                android:id="@+id/tvHostMac"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="AA:BB:CC:DD:EE:FF"
-                                android:textAppearance="?attr/textAppearanceTitleLarge"
-                                android:textStyle="bold"
-                                android:textColor="?attr/colorOnSecondaryContainer"
-                                android:layout_marginTop="2dp"/>
-
-                            <TextView
-                                android:id="@+id/tvHostPsm"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="PSM: 12345"
-                                android:textAppearance="?attr/textAppearanceLabelLarge"
-                                android:textColor="?attr/colorOnSecondaryContainer"
-                                android:layout_marginTop="2dp"/>
-                        </LinearLayout>
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnCopyHostInfo"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/btn_copy_mac"
-                            app:icon="@drawable/ic_copy"
-                            style="?attr/materialButtonOutlinedStyle"/>
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView android:text="@string/traffic_tx" android:textAppearance="?attr/textAppearanceLabelMedium" android:textColor="?attr/colorOnSurfaceVariant" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                        <TextView android:id="@+id/tvClientTxSpeed" android:text="0 B/s" android:textAppearance="?attr/textAppearanceTitleMedium" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                        <TextView android:id="@+id/tvClientTxTotal" android:text="Total: 0 B" android:textAppearance="?attr/textAppearanceBodySmall" android:textColor="?attr/colorOnSurfaceVariant" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
                     </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- Host Traffic Dashboard Stats -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/layoutHostTrafficStats"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:cardBackgroundColor="?attr/colorSurfaceVariant"
-                    app:cardElevation="0dp"
-                    app:cardCornerRadius="16dp"
-                    android:visibility="gone"
-                    android:layout_marginTop="16dp">
-
+                    <!-- RX -->
                     <LinearLayout
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:padding="16dp">
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:gravity="center">
-
-                            <LinearLayout
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:orientation="horizontal"
-                                android:gravity="center_vertical">
-
-                                <ImageView
-                                    android:layout_width="16dp"
-                                    android:layout_height="16dp"
-                                    android:src="@drawable/ic_arrow_up"
-                                    app:tint="?attr/colorPrimary"
-                                    android:contentDescription="Upload" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text=" TX (Sent)"
-                                    android:textAppearance="?attr/textAppearanceLabelMedium"
-                                    android:textColor="?attr/colorPrimary"/>
-                            </LinearLayout>
-
-                            <TextView
-                                android:id="@+id/tvHostTxSpeed"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="0 B/s"
-                                android:textAppearance="?attr/textAppearanceTitleLarge"
-                                android:textStyle="bold"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:layout_marginTop="2dp"/>
-
-                            <TextView
-                                android:id="@+id/tvHostTxTotal"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Total: 0 B"
-                                android:textAppearance="?attr/textAppearanceBodySmall"
-                                android:textColor="?attr/colorOnSurfaceVariant"/>
-                        </LinearLayout>
-
-                        <View
-                            android:layout_width="1dp"
-                            android:layout_height="match_parent"
-                            android:background="?attr/colorOutlineVariant"
-                            android:layout_marginHorizontal="8dp"/>
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:gravity="center">
-
-                            <LinearLayout
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:orientation="horizontal"
-                                android:gravity="center_vertical">
-
-                                <ImageView
-                                    android:layout_width="16dp"
-                                    android:layout_height="16dp"
-                                    android:src="@drawable/ic_arrow_down"
-                                    app:tint="?attr/colorTertiary"
-                                    android:contentDescription="Download" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text=" RX (Received)"
-                                    android:textAppearance="?attr/textAppearanceLabelMedium"
-                                    android:textColor="?attr/colorTertiary"/>
-                            </LinearLayout>
-
-                            <TextView
-                                android:id="@+id/tvHostRxSpeed"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="0 B/s"
-                                android:textAppearance="?attr/textAppearanceTitleLarge"
-                                android:textStyle="bold"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:layout_marginTop="2dp"/>
-
-                            <TextView
-                                android:id="@+id/tvHostRxTotal"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Total: 0 B"
-                                android:textAppearance="?attr/textAppearanceBodySmall"
-                                android:textColor="?attr/colorOnSurfaceVariant"/>
-                        </LinearLayout>
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView android:text="@string/traffic_rx" android:textAppearance="?attr/textAppearanceLabelMedium" android:textColor="?attr/colorOnSurfaceVariant" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                        <TextView android:id="@+id/tvClientRxSpeed" android:text="0 B/s" android:textAppearance="?attr/textAppearanceTitleMedium" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                        <TextView android:id="@+id/tvClientRxTotal" android:text="Total: 0 B" android:textAppearance="?attr/textAppearanceBodySmall" android:textColor="?attr/colorOnSurfaceVariant" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
                     </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
+                </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnToggleHost"
+                    android:id="@+id/btnDisconnect"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:text="@string/btn_start_host"
-                    android:textAppearance="?attr/textAppearanceTitleMedium"
-                    android:textStyle="bold"
-                    android:layout_marginTop="20dp"
-                    app:cornerRadius="14dp"/>
+                    android:layout_height="wrap_content"
+                    android:text="@string/btn_disconnect"
+                    style="?attr/materialButtonOutlinedStyle"
+                    app:strokeColor="?attr/colorError"
+                    android:textColor="?attr/colorError" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- CLIENT PANEL -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardClient"
+        <!-- Nearby Peers Section -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="0dp"
-            app:strokeWidth="1dp"
-            app:strokeColor="?attr/colorOutlineVariant"
-            app:cardBackgroundColor="?attr/colorSurface">
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp"
+            android:layout_marginTop="8dp">
 
-            <LinearLayout
-                android:layout_width="match_parent"
+            <TextView
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
+                android:layout_weight="1"
+                android:text="@string/nearby_peers_title"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textStyle="bold" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Client Mode (Tether Receiver)"
-                    android:textAppearance="?attr/textAppearanceTitleMedium"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorPrimary"/>
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipPeerCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 peers" />
+        </LinearLayout>
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Connect to a Host device to receive accelerated internet access."
-                    android:textAppearance="?attr/textAppearanceBodySmall"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:layout_marginTop="2dp"/>
+        <TextView
+            android:id="@+id/tvNoPeers"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/no_peers_found"
+            android:textAlignment="center"
+            android:padding="32dp"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSurfaceVariant" />
 
-                <!-- Quick Device Selector Header & Spinner -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginTop="16dp">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/select_device_label"
-                        android:textAppearance="?attr/textAppearanceLabelLarge"
-                        android:textColor="?attr/colorOnSurfaceVariant"/>
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnScanNearby"
-                        android:layout_width="wrap_content"
-                        android:layout_height="44dp"
-                        android:text="Scan Nearby"
-                        app:icon="@drawable/ic_bluetooth_host"
-                        app:iconGravity="textStart"
-                        style="?attr/materialButtonOutlinedStyle"
-                        android:layout_marginEnd="6dp"/>
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnRefreshDevices"
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:padding="0dp"
-                        app:icon="@drawable/ic_refresh"
-                        app:iconGravity="textStart"
-                        style="?attr/materialButtonOutlinedStyle"
-                        android:contentDescription="@string/refresh_devices"/>
-                </LinearLayout>
-
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="0dp"
-                    app:strokeWidth="1dp"
-                    app:strokeColor="?attr/colorOutlineVariant"
-                    app:cardBackgroundColor="?attr/colorSurfaceVariant"
-                    android:layout_marginTop="8dp">
-
-                    <Spinner
-                        android:id="@+id/spDevices"
-                        android:layout_width="match_parent"
-                        android:layout_height="50dp"
-                        android:paddingHorizontal="12dp"/>
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- Manual Connection Fields -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/enter_mac_label"
-                    android:textAppearance="?attr/textAppearanceLabelLarge"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:layout_marginTop="16dp"/>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="8dp">
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/tilMacAddress"
-                        android:layout_width="0dp"
-                        android:layout_weight="2"
-                        android:layout_height="wrap_content"
-                        android:hint="Host MAC Address"
-                        app:boxCornerRadiusTopStart="12dp"
-                        app:boxCornerRadiusTopEnd="12dp"
-                        app:boxCornerRadiusBottomStart="12dp"
-                        app:boxCornerRadiusBottomEnd="12dp"
-                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etMacAddress"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="textCapCharacters"
-                            android:singleLine="true" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/tilPsm"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:hint="PSM"
-                        android:layout_marginStart="10dp"
-                        app:boxCornerRadiusTopStart="12dp"
-                        app:boxCornerRadiusTopEnd="12dp"
-                        app:boxCornerRadiusBottomStart="12dp"
-                        app:boxCornerRadiusBottomEnd="12dp"
-                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etPsm"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="number"
-                            android:singleLine="true" />
-                    </com.google.android.material.textfield.TextInputLayout>
-                </LinearLayout>
-
-                <!-- Compatibility Mode Switch -->
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="0dp"
-                    app:strokeWidth="1dp"
-                    app:strokeColor="?attr/colorOutlineVariant"
-                    app:cardBackgroundColor="?attr/colorSurfaceVariant"
-                    android:layout_marginTop="16dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="14dp">
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/compat_mode_title"
-                                android:textAppearance="?attr/textAppearanceBodyMedium"
-                                android:textStyle="bold"
-                                android:textColor="?attr/colorOnSurface"/>
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/compat_mode_subtitle"
-                                android:textAppearance="?attr/textAppearanceBodySmall"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:layout_marginTop="2dp"/>
-                        </LinearLayout>
-
-                        <com.google.android.material.materialswitch.MaterialSwitch
-                            android:id="@+id/swCompatMode"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"/>
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- Auto-Reconnect Switch -->
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="0dp"
-                    app:strokeWidth="1dp"
-                    app:strokeColor="?attr/colorOutlineVariant"
-                    app:cardBackgroundColor="?attr/colorSurfaceVariant"
-                    android:layout_marginTop="12dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="14dp">
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/auto_reconnect_title"
-                                android:textAppearance="?attr/textAppearanceBodyMedium"
-                                android:textStyle="bold"
-                                android:textColor="?attr/colorOnSurface"/>
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/auto_reconnect_subtitle"
-                                android:textAppearance="?attr/textAppearanceBodySmall"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:layout_marginTop="2dp"/>
-                        </LinearLayout>
-
-                        <com.google.android.material.materialswitch.MaterialSwitch
-                            android:id="@+id/swAutoReconnect"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"/>
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- Client Traffic Dashboard Stats -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/layoutClientTrafficStats"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:cardBackgroundColor="?attr/colorSurfaceVariant"
-                    app:cardElevation="0dp"
-                    app:cardCornerRadius="16dp"
-                    android:visibility="gone"
-                    android:layout_marginTop="16dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:padding="16dp">
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:gravity="center">
-
-                            <LinearLayout
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:orientation="horizontal"
-                                android:gravity="center_vertical">
-
-                                <ImageView
-                                    android:layout_width="16dp"
-                                    android:layout_height="16dp"
-                                    android:src="@drawable/ic_arrow_up"
-                                    app:tint="?attr/colorPrimary"
-                                    android:contentDescription="Upload" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text=" TX (Sent)"
-                                    android:textAppearance="?attr/textAppearanceLabelMedium"
-                                    android:textColor="?attr/colorPrimary"/>
-                            </LinearLayout>
-
-                            <TextView
-                                android:id="@+id/tvClientTxSpeed"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="0 B/s"
-                                android:textAppearance="?attr/textAppearanceTitleLarge"
-                                android:textStyle="bold"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:layout_marginTop="2dp"/>
-
-                            <TextView
-                                android:id="@+id/tvClientTxTotal"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Total: 0 B"
-                                android:textAppearance="?attr/textAppearanceBodySmall"
-                                android:textColor="?attr/colorOnSurfaceVariant"/>
-                        </LinearLayout>
-
-                        <View
-                            android:layout_width="1dp"
-                            android:layout_height="match_parent"
-                            android:background="?attr/colorOutlineVariant"
-                            android:layout_marginHorizontal="8dp"/>
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:gravity="center">
-
-                            <LinearLayout
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:orientation="horizontal"
-                                android:gravity="center_vertical">
-
-                                <ImageView
-                                    android:layout_width="16dp"
-                                    android:layout_height="16dp"
-                                    android:src="@drawable/ic_arrow_down"
-                                    app:tint="?attr/colorTertiary"
-                                    android:contentDescription="Download" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text=" RX (Received)"
-                                    android:textAppearance="?attr/textAppearanceLabelMedium"
-                                    android:textColor="?attr/colorTertiary"/>
-                            </LinearLayout>
-
-                            <TextView
-                                android:id="@+id/tvClientRxSpeed"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="0 B/s"
-                                android:textAppearance="?attr/textAppearanceTitleLarge"
-                                android:textStyle="bold"
-                                android:textColor="?attr/colorOnSurfaceVariant"
-                                android:layout_marginTop="2dp"/>
-
-                            <TextView
-                                android:id="@+id/tvClientRxTotal"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Total: 0 B"
-                                android:textAppearance="?attr/textAppearanceBodySmall"
-                                android:textColor="?attr/colorOnSurfaceVariant"/>
-                        </LinearLayout>
-                    </LinearLayout>
-                </com.google.android.material.card.MaterialCardView>
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnToggleClient"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:text="@string/btn_connect_mac"
-                    android:textAppearance="?attr/textAppearanceTitleMedium"
-                    android:textStyle="bold"
-                    android:layout_marginTop="20dp"
-                    app:cornerRadius="14dp"/>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvPeers"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:nestedScrollingEnabled="false"
+            android:clipToPadding="false"
+            android:paddingBottom="32dp" />
 
     </LinearLayout>
 </ScrollView>
