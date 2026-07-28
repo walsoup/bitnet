@@ -182,7 +182,6 @@ class MainActivity : AppCompatActivity() {
             meshManager.connectionState.collect { state ->
                 val greenColor = ContextCompat.getColor(this@MainActivity, R.color.status_green)
                 val amberColor = ContextCompat.getColor(this@MainActivity, R.color.status_amber)
-                val mutedColor = ContextCompat.getColor(this@MainActivity, R.color.text_muted)
                 
                 when (state) {
                     ConnectionState.DISCONNECTED -> {
