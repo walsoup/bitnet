@@ -29,6 +29,14 @@ class BlueNetVpnService : VpnService() {
     private var multiplexer: StreamMultiplexer? = null
     private var packetRouter: TunPacketRouter? = null
 
+    private var userRequestedDisconnect: Boolean = false
+    private var reconnectAttempt: Int = 0
+    private val reconnectHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var lastDeviceAddress: String? = null
+    private var lastPsm: Int = 1
+    private var lastCompatMode: Boolean = false
+    private var statusCallback: ((String) -> Unit)? = null
+
     var isVpnConnected: Boolean = false
         private set
 
@@ -43,7 +51,7 @@ class BlueNetVpnService : VpnService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_DISCONNECT_VPN) {
-            stopVpn()
+            stopVpn(userExplicit = true)
             return START_NOT_STICKY
         }
         return super.onStartCommand(intent, flags, startId)
@@ -58,6 +66,12 @@ class BlueNetVpnService : VpnService() {
 
     @SuppressLint("MissingPermission")
     fun connectToHost(deviceAddress: String, psm: Int, compatMode: Boolean = false, onStatusChanged: (String) -> Unit) {
+        userRequestedDisconnect = false
+        lastDeviceAddress = deviceAddress
+        lastPsm = psm
+        lastCompatMode = compatMode
+        statusCallback = onStatusChanged
+
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val bluetoothAdapter = bluetoothManager.adapter
         val device = bluetoothAdapter?.getRemoteDevice(deviceAddress)
@@ -69,7 +83,19 @@ class BlueNetVpnService : VpnService() {
 
         val modeDesc = if (compatMode) "RFCOMM Compat Mode" else "PSM $psm"
         onStatusChanged("Connecting ($modeDesc) to $deviceAddress...")
-        startForeground(NOTIFICATION_ID, createNotification("Connecting to $deviceAddress..."))
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    createNotification("Connecting to $deviceAddress..."),
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, createNotification("Connecting to $deviceAddress..."))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start foreground service", e)
+        }
 
         l2capClient = L2capClient(
             context = this,
@@ -80,11 +106,38 @@ class BlueNetVpnService : VpnService() {
                 setupVpnTunnel(socket.inputStream, socket.outputStream, onStatusChanged)
             },
             onError = { err ->
-                onStatusChanged(err)
-                stopVpn()
+                Log.w(TAG, "L2CAP Client error: $err")
+                handleUnexpectedDisconnect(err)
             }
         )
         l2capClient?.connect(compatMode)
+    }
+
+    private fun handleUnexpectedDisconnect(errorMessage: String) {
+        val autoConnectEnabled = com.bluenet.utils.PreferencesManager.isAutoConnectEnabled(this)
+        if (!userRequestedDisconnect && autoConnectEnabled && reconnectAttempt < MAX_RECONNECT_ATTEMPTS && lastDeviceAddress != null) {
+            reconnectAttempt++
+            val delayMs = reconnectAttempt * 4000L
+            val statusMsg = "Connection lost. Reconnecting ($reconnectAttempt/$MAX_RECONNECT_ATTEMPTS) in ${delayMs / 1000}s..."
+            statusCallback?.invoke(statusMsg)
+            updateNotification(statusMsg)
+            Log.d(TAG, statusMsg)
+
+            cleanupSocketsOnly()
+
+            reconnectHandler.postDelayed({
+                if (!userRequestedDisconnect && !isVpnConnected && lastDeviceAddress != null) {
+                    val addr = lastDeviceAddress!!
+                    val psm = lastPsm
+                    val compat = lastCompatMode
+                    val callback = statusCallback ?: {}
+                    connectToHost(addr, psm, compat, callback)
+                }
+            }, delayMs)
+        } else {
+            statusCallback?.invoke(errorMessage)
+            stopVpn(userExplicit = false)
+        }
     }
 
     private fun setupVpnTunnel(inputStream: java.io.InputStream, outputStream: java.io.OutputStream, onStatusChanged: (String) -> Unit) {
@@ -101,7 +154,7 @@ class BlueNetVpnService : VpnService() {
 
             if (vpnInterface == null) {
                 onStatusChanged("Failed to create TUN Interface")
-                stopVpn()
+                stopVpn(userExplicit = false)
                 return
             }
 
@@ -115,8 +168,7 @@ class BlueNetVpnService : VpnService() {
                 onFrameReceived = { frame -> packetRouter?.handleIncomingFrame(frame) },
                 onError = { err ->
                     Log.e(TAG, "Client multiplexer error", err)
-                    onStatusChanged("L2CAP Multiplexer Disconnected")
-                    stopVpn()
+                    handleUnexpectedDisconnect("L2CAP Multiplexer Disconnected")
                 }
             )
             multiplexer = mp
@@ -126,20 +178,21 @@ class BlueNetVpnService : VpnService() {
             packetRouter?.start()
 
             isVpnConnected = true
+            reconnectAttempt = 0
             updateNotification("BlueNet VPN Connected & Tunneling Traffic")
             onStatusChanged("Connected! Speed-optimized L2CAP Tethering Active")
             Log.d(TAG, "VPN Tunnel established over L2CAP")
         } catch (e: Exception) {
             Log.e(TAG, "Error setting up VPN tunnel", e)
             onStatusChanged("VPN Setup Error: ${e.localizedMessage}")
-            stopVpn()
+            stopVpn(userExplicit = false)
         }
     }
 
     fun getTxBytes(): Long = multiplexer?.getTxBytes() ?: 0L
     fun getRxBytes(): Long = multiplexer?.getRxBytes() ?: 0L
 
-    fun stopVpn() {
+    private fun cleanupSocketsOnly() {
         packetRouter?.stop()
         packetRouter = null
 
@@ -155,9 +208,20 @@ class BlueNetVpnService : VpnService() {
         vpnInterface = null
 
         isVpnConnected = false
+    }
+
+    fun stopVpn(userExplicit: Boolean = true) {
+        if (userExplicit) {
+            userRequestedDisconnect = true
+            reconnectAttempt = 0
+            reconnectHandler.removeCallbacksAndMessages(null)
+        }
+
+        cleanupSocketsOnly()
+
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
-        Log.d(TAG, "BlueNetVpnService stopped")
+        Log.d(TAG, "BlueNetVpnService stopped (userExplicit=$userExplicit)")
     }
 
     private fun createNotificationChannel() {
@@ -212,6 +276,7 @@ class BlueNetVpnService : VpnService() {
         private const val TAG = "BlueNetVpnService"
         private const val CHANNEL_ID = "bluenet_vpn_channel"
         private const val NOTIFICATION_ID = 2002
+        private const val MAX_RECONNECT_ATTEMPTS = 5
         const val ACTION_DISCONNECT_VPN = "com.bluenet.ACTION_DISCONNECT_VPN"
     }
 }

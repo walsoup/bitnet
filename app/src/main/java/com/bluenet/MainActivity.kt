@@ -134,12 +134,14 @@ class MainActivity : AppCompatActivity() {
         val savedMac = PreferencesManager.getLastMac(this)
         val savedPsm = PreferencesManager.getLastPsm(this)
         val compatMode = PreferencesManager.getCompatMode(this)
+        val autoReconnect = PreferencesManager.isAutoConnectEnabled(this)
 
         if (savedMac.isNotEmpty()) {
             binding.etMacAddress.setText(savedMac)
         }
         binding.etPsm.setText(savedPsm.toString())
         binding.swCompatMode.isChecked = compatMode
+        binding.swAutoReconnect.isChecked = autoReconnect
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -391,6 +393,11 @@ class MainActivity : AppCompatActivity() {
             showScannerDialog()
         }
 
+        binding.swAutoReconnect.setOnCheckedChangeListener { _, isChecked ->
+            triggerHaptic(HapticFeedbackConstants.CLOCK_TICK)
+            PreferencesManager.setAutoConnect(this, isChecked)
+        }
+
         binding.btnToggleClient.setOnClickListener {
             val service = vpnService ?: return@setOnClickListener
             if (service.isVpnConnected) {
@@ -517,13 +524,22 @@ class MainActivity : AppCompatActivity() {
         PreferencesManager.saveClientConnection(this, targetMac, psm, compatMode)
 
         val vpnIntent = Intent(this, BlueNetVpnService::class.java)
-        startService(vpnIntent)
+        ContextCompat.startForegroundService(this, vpnIntent)
+        if (!isVpnBound) {
+            bindService(vpnIntent, vpnServiceConnection, Context.BIND_AUTO_CREATE)
+        }
 
-        vpnService?.connectToHost(targetMac, psm, compatMode) { statusText ->
-            runOnUiThread {
-                updateClientUi()
-                updateGlobalStatus(statusText)
+        val service = vpnService
+        if (service != null) {
+            service.connectToHost(targetMac, psm, compatMode) { statusText ->
+                runOnUiThread {
+                    updateClientUi()
+                    updateGlobalStatus(statusText)
+                }
             }
+        } else {
+            // Service not bound yet, defer connect or use callback once bound
+            updateGlobalStatus("Service starting... Please try connecting again in a moment.")
         }
         updateGlobalStatus("Connecting to $targetMac...")
     }

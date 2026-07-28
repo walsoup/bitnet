@@ -15,6 +15,8 @@
     <string name="copied_to_clipboard">Copied Host info to clipboard!</string>
     <string name="compat_mode_title">Compatibility Mode (RFCOMM Force)</string>
     <string name="compat_mode_subtitle">Use for older Bluetooth devices or legacy hardware without L2CAP support</string>
+    <string name="auto_reconnect_title">Auto-Reconnect on Disconnect</string>
+    <string name="auto_reconnect_subtitle">Automatically attempt connection retry if Bluetooth link drops</string>
     <string name="traffic_tx">▲ Upload (TX)</string>
     <string name="traffic_rx">▼ Download (RX)</string>
     <string name="no_paired_devices">No paired Bluetooth devices found</string>
