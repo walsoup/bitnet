@@ -77,11 +77,12 @@ class MeshManager(private val context: Context, private val bluetoothAdapter: Bl
     fun start(peerId: String, displayName: String) {
         if (!isReceiverRegistered) {
             val filter = IntentFilter(BlueNetVpnService.ACTION_VPN_STATE_CHANGED)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.registerReceiver(vpnStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                context.registerReceiver(vpnStateReceiver, filter)
-            }
+            ContextCompat.registerReceiver(
+                context,
+                vpnStateReceiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
             isReceiverRegistered = true
         }
 

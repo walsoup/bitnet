@@ -129,13 +129,7 @@ class MeshService : Service() {
             .build()
     }
 
-    @android.annotation.SuppressLint("MissingPermission", "NotificationPermission")
     private fun updateNotification(peerCount: Int) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                return
-            }
-        }
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID, buildNotification(peerCount))
     }
