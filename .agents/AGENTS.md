@@ -21,9 +21,9 @@
   @SuppressLint("MissingPermission", "NotificationPermission")
   ```
 
-### 3. Material Design 3 Attribute Naming
-- **Constraint:** Using incorrect or shortened Material theme attribute resource IDs (like `?attr/onPrimaryContainer` instead of `?attr/colorOnPrimaryContainer`) will fail resource linking at build time.
-- **Rule:** Always use the full M3 attribute names (e.g., `?attr/colorOnPrimaryContainer`, `?attr/colorPrimaryContainer`, `?attr/colorOnSurfaceVariant`).
+### 3. Theme Colors
+- **Constraint:** The app theme is AppCompat, not Material Components, so Material theme attributes such as `?attr/colorSurfaceVariant` fail resource linking.
+- **Rule:** Reference the `@color/bn_*` palette (defined in `values/colors.xml` with dark variants in `values-night/colors.xml`) for every color in layouts and drawables.
 
 ## Git and Workspace Management Rules
 

@@ -207,9 +207,10 @@ class TunnelClient(
             }
         }
 
-        if (segment.has(TcpSegment.FIN) && !flow.appFinished) {
+        if (segment.has(TcpSegment.FIN)) {
+            // A retransmitted FIN means our ACK was lost, so it must be acknowledged again.
             needAck = true
-            if (segment.seq + payload.size == flow.rcvNxt) {
+            if (!flow.appFinished && segment.seq + payload.size == flow.rcvNxt) {
                 flow.rcvNxt += 1
                 flow.appFinished = true
                 link.send(TunnelFrame.fin(flow.streamId))

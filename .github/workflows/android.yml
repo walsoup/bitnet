@@ -24,6 +24,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest -Pandroid.aapt2FromMavenOverride=
+
       - name: Run Lint
         run: ./gradlew lint -Pandroid.aapt2FromMavenOverride=
 
