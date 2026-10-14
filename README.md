@@ -53,6 +53,7 @@ BlueNet links nearby Android phones over Bluetooth Low Energy. Phones find each 
 - **Mesh chat.** Direct and broadcast messages that hop between phones, with delivery receipts.
 - **Internet sharing.** One switch to share; one tap on a nearby sharer to use it. Links that drop are re-established automatically.
 - **Quick Settings tiles.** Toggle sharing, or reconnect to the last sharer, from the notification shade.
+- **Calm UI.** Jetpack Compose screens built on the Linen design system, in light and dark.
 
 ---
 
@@ -91,7 +92,9 @@ app/src/main/java/com/bluenet/
 ├── link/             # LinkManager: L2CAP sockets, one link per peer, channel dispatch
 ├── node/             # MeshNode composition root, settings, peer directory
 ├── service/          # Mesh foreground service, VPN service, Quick Settings tiles
-└── ui/               # Main screen and chat (AppCompat views)
+└── ui/               # Main screen and chat (Jetpack Compose)
+
+design/               # Linen design system (Compose tokens, theme, components)
 ```
 
 ---

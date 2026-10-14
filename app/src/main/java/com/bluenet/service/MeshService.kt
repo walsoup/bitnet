@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
@@ -20,6 +21,7 @@ import com.bluenet.core.Log
 import com.bluenet.node.MeshNode
 import com.bluenet.node.MeshRuntime
 import com.bluenet.ui.MainActivity
+import com.walsoup.linen.LinenPalette
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -107,6 +109,7 @@ class MeshService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_bluetooth_host)
+            .setColor(LinenPalette.Forest.toArgb())
             .setContentTitle(getString(R.string.notification_title))
             .setContentText(text)
             .setContentIntent(open)

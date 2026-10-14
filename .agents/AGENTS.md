@@ -21,9 +21,10 @@
   @SuppressLint("MissingPermission", "NotificationPermission")
   ```
 
-### 3. Theme Colors
-- **Constraint:** The app theme is AppCompat, not Material Components, so Material theme attributes such as `?attr/colorSurfaceVariant` fail resource linking.
-- **Rule:** Reference the `@color/bn_*` palette (defined in `values/colors.xml` with dark variants in `values-night/colors.xml`) for every color in layouts and drawables.
+### 3. UI and Theme
+UI: build every screen with the Linen design system; follow design/AGENTS.md.
+- **Constraint:** Screens are Jetpack Compose wrapped in `LinenTheme`. The XML `Theme.BlueNet` only styles the window.
+- **Rule:** Take colors from `Linen.colors`, type from `Linen.type` and spacing from `LinenDimens`. Code that can't use Compose (notifications, tiles) uses `LinenPalette`. Don't add hex colors or a color scheme under `app/`; the launcher icon is the one exception.
 
 ## Git and Workspace Management Rules
 

@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "BlueNet"
 include(":app")
+include(":design")

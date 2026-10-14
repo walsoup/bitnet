@@ -3,80 +3,54 @@ package com.bluenet.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.view.View
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.widget.doAfterTextChanged
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bluenet.R
 import com.bluenet.core.mesh.ChatMessage
-import com.bluenet.databinding.ActivityChatBinding
 import com.bluenet.node.MeshNode
 import com.bluenet.node.MeshRuntime
-import kotlinx.coroutines.flow.combine
+import com.walsoup.linen.LinenTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 
 /** A direct conversation with one peer, or the broadcast chat when no peer ID is given. */
-class ChatActivity : AppCompatActivity() {
-    private lateinit var binding: ActivityChatBinding
+class ChatActivity : ComponentActivity() {
     private val node: MeshNode by lazy { MeshRuntime.node(this) }
-    private var peerId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        binding = ActivityChatBinding.inflate(layoutInflater)
-        setContentView(binding.root)
 
-        peerId = intent.getStringExtra(EXTRA_PEER_ID)
+        val peerId = intent.getStringExtra(EXTRA_PEER_ID)
         val conversation = peerId ?: ChatMessage.BROADCAST_CONVERSATION
-        binding.titleText.text = intent.getStringExtra(EXTRA_TITLE) ?: getString(R.string.broadcast_chat)
+        val title = intent.getStringExtra(EXTRA_TITLE) ?: getString(R.string.broadcast_chat)
 
-        val adapter = MessageAdapter(showSender = peerId == null)
-        binding.messageList.layoutManager = LinearLayoutManager(this).apply { stackFromEnd = true }
-        binding.messageList.adapter = adapter
+        setContent {
+            val conversationMessages = remember {
+                node.messages.messages
+                    .map { all -> all.filter { it.conversationId == conversation } }
+                    .distinctUntilChanged()
+            }
+            val messages by conversationMessages.collectAsStateWithLifecycle(emptyList())
+            val peers by node.peers.collectAsStateWithLifecycle()
+            val linked by node.linkedCount.collectAsStateWithLifecycle()
 
-        binding.backButton.setOnClickListener { finish() }
-        binding.sendButton.isEnabled = false
-        binding.messageInput.doAfterTextChanged { binding.sendButton.isEnabled = !it.isNullOrBlank() }
-        binding.sendButton.setOnClickListener {
-            val text = binding.messageInput.text.toString()
-            if (text.isBlank()) return@setOnClickListener
-            node.sendText(peerId, text)
-            binding.messageInput.text.clear()
-        }
-
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch {
-                    node.messages.messages
-                        .map { all -> all.filter { it.conversationId == conversation } }
-                        .distinctUntilChanged()
-                        .collect { messages ->
-                            adapter.submitList(messages) {
-                                if (messages.isNotEmpty()) binding.messageList.scrollToPosition(messages.size - 1)
-                            }
-                            binding.emptyText.visibility = if (messages.isEmpty()) View.VISIBLE else View.GONE
-                        }
-                }
-                launch {
-                    combine(node.peers, node.linkedCount) { peers, linked -> peers to linked }.collect { (peers, linked) ->
-                        val id = peerId
-                        binding.subtitleText.text = if (id == null) {
-                            getString(R.string.broadcast_chat_subtitle)
-                        } else {
-                            val peer = peers.firstOrNull { it.id == id }
-                            when {
-                                peer == null -> getString(R.string.peer_out_of_range)
-                                else -> PeerAdapter.details(this@ChatActivity, peer)
-                            }
-                        }
-                        binding.offlineText.visibility = if (linked == 0) View.VISIBLE else View.GONE
-                    }
-                }
+            LinenTheme {
+                ChatScreen(
+                    state = ChatUiState(
+                        title = title,
+                        broadcast = peerId == null,
+                        peer = peerId?.let { id -> peers.firstOrNull { it.id == id } },
+                        linked = linked > 0,
+                        messages = messages,
+                    ),
+                    onBack = ::finish,
+                    onSend = { node.sendText(peerId, it) },
+                )
             }
         }
     }
