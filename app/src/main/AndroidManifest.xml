@@ -2,28 +2,29 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Location Permissions for Bluetooth Discovery (Required on Android 10 & 11) -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
-    <!-- Bluetooth Permissions -->
+    <!-- BLE scanning on Android 10/11 requires location; 12+ uses BLUETOOTH_SCAN instead. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" tools:targetApi="31" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
 
-    <!-- Internet, VPN & Haptics Permissions -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="31" />
+
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
-    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-
     <application
-        android:allowBackup="true"
+        android:name=".BlueNetApp"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
@@ -31,32 +32,28 @@
         android:theme="@style/Theme.BlueNet">
 
         <activity
-            android:name=".MainActivity"
-            android:exported="true">
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- Host Foreground Service -->
+        <activity
+            android:name=".ui.ChatActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.MainActivity"
+            android:windowSoftInputMode="adjustResize" />
+
         <service
-            android:name=".host.HostService"
-            android:enabled="true"
+            android:name=".service.MeshService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
-        <!-- Mesh Discovery Service -->
         <service
-            android:name=".mesh.MeshService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
-
-        <!-- Client VPN Service -->
-        <service
-            android:name=".client.BlueNetVpnService"
-            android:enabled="true"
+            android:name=".service.BlueNetVpnService"
             android:exported="false"
             android:permission="android.permission.BIND_VPN_SERVICE">
             <intent-filter>
@@ -64,30 +61,33 @@
             </intent-filter>
         </service>
 
-        <!-- Quick Settings Tile Services -->
         <service
-            android:name=".service.BlueNetHostTileService"
+            android:name=".service.ShareTileService"
+            android:exported="true"
             android:icon="@drawable/ic_bluetooth_host"
-            android:label="Share Internet"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
-            android:exported="true">
+            android:label="@string/tile_share"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
         </service>
 
         <service
-            android:name=".service.BlueNetClientTileService"
+            android:name=".service.ConnectTileService"
+            android:exported="true"
             android:icon="@drawable/ic_bluetooth_client"
-            android:label="Mesh Connect"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
-            android:exported="true">
+            android:label="@string/tile_connect"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
         </service>
-
-        <activity android:name=".ChatActivity" android:exported="false" android:theme="@style/Theme.BlueNet" />
     </application>
 
 </manifest>
