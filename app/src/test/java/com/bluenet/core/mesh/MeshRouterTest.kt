@@ -163,4 +163,12 @@ class MeshRouterTest {
         assertEquals(3, store.messages.value.size)
         assertFalse(store.messages.value.any { it.id == "m1" })
     }
+
+    @Test
+    fun ackThatArrivesBeforeTheMessageIsStoredStillMarksItDelivered() {
+        val store = MessageStore()
+        store.markDelivered("early")
+        store.add(ChatMessage("early", "1111111111111111", "2222222222222222", "me", "hi", 1, MessageStatus.SENT, 0, outgoing = true))
+        assertEquals(MessageStatus.DELIVERED, store.messages.value.single().status)
+    }
 }

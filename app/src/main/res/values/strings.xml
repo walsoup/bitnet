@@ -8,7 +8,6 @@
     <string name="status_bluetooth_off">Bluetooth is off</string>
     <string name="status_permissions">Bluetooth permissions needed</string>
     <string name="status_idle">Mesh active</string>
-    <string name="status_peers">%1$d nearby · %2$d linked</string>
     <string name="status_unsupported">This device can\'t host BLE links</string>
 
     <string name="you_are">You are %1$s</string>
@@ -29,6 +28,8 @@
     <string name="tunnel_failed">Couldn\'t connect: %1$s</string>
     <string name="tunnel_stats">▲ %1$s   ▼ %2$s   %3$d flows</string>
     <string name="disconnect">Disconnect</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="connect_blocked_while_sharing">Turn off sharing to use someone else\'s internet</string>
 
     <string name="nearby_title">Nearby</string>
     <string name="broadcast_chat">Everyone</string>
@@ -40,6 +41,11 @@
     <string name="peer_linked">Linked</string>
     <string name="peer_hops">%1$d hops</string>
     <string name="peer_signal">%1$d dBm</string>
+    <string name="peer_via_mesh">Reachable through the mesh</string>
+    <string name="peer_out_of_range">Not in range · messages are relayed if a path exists</string>
+    <string name="status_running">Mesh active · %1$d nearby · %2$d linked</string>
+    <string name="status_stopped">Mesh stopped</string>
+    <string name="status_no_bluetooth">This device has no Bluetooth</string>
 
     <string name="chat_hint">Message</string>
     <string name="chat_send">Send</string>
@@ -47,7 +53,7 @@
     <string name="chat_delivered">Delivered</string>
     <string name="chat_sent">Sent</string>
     <string name="chat_via_hops">via %1$d hops</string>
-    <string name="chat_unreachable">Not connected to the mesh yet — your message will be sent to whoever is in range.</string>
+    <string name="chat_unreachable">No nearby device is linked yet, so messages can\'t leave this phone.</string>
 
     <string name="permission_rationale">BlueNet needs Bluetooth access to find and connect to nearby devices.</string>
     <string name="permission_denied">Bluetooth permissions were denied</string>

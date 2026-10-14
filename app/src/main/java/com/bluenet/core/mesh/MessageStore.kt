@@ -34,12 +34,20 @@ data class ChatMessage(
 /** In-memory chat history, capped at [capacity] messages. */
 class MessageStore(private val capacity: Int = 1_000) {
     private val messagesById = LinkedHashMap<String, ChatMessage>()
+    /** ACKs that arrived before their message was stored (the ACK can beat `add` on another thread). */
+    private val earlyAcks = object : LinkedHashSet<String>() {
+        override fun add(element: String): Boolean {
+            if (size >= MAX_EARLY_ACKS) remove(first())
+            return super.add(element)
+        }
+    }
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
 
     @Synchronized
     fun add(message: ChatMessage) {
-        messagesById[message.id] = message
+        val acked = message.outgoing && message.status == MessageStatus.SENT && earlyAcks.remove(message.id)
+        messagesById[message.id] = if (acked) message.copy(status = MessageStatus.DELIVERED) else message
         while (messagesById.size > capacity) {
             messagesById.remove(messagesById.keys.first())
         }
@@ -48,7 +56,11 @@ class MessageStore(private val capacity: Int = 1_000) {
 
     @Synchronized
     fun markDelivered(messageId: String) {
-        val existing = messagesById[messageId] ?: return
+        val existing = messagesById[messageId]
+        if (existing == null) {
+            earlyAcks.add(messageId)
+            return
+        }
         if (existing.status == MessageStatus.DELIVERED) return
         messagesById[messageId] = existing.copy(status = MessageStatus.DELIVERED)
         publish()
@@ -59,5 +71,9 @@ class MessageStore(private val capacity: Int = 1_000) {
 
     private fun publish() {
         _messages.value = messagesById.values.sortedBy { it.timestamp }
+    }
+
+    private companion object {
+        const val MAX_EARLY_ACKS = 256
     }
 }
