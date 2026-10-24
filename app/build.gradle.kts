@@ -18,12 +18,41 @@ android {
         versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        resourceConfigurations += "en"
+    }
+
+    signingConfigs {
+        val keystore = providers.environmentVariable("BLUENET_KEYSTORE").orNull
+        if (keystore != null) {
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = providers.environmentVariable("BLUENET_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("BLUENET_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("BLUENET_KEY_PASSWORD").get()
+            }
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            // Without a release key the APK is still installable, but each machine's debug key differs.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
+    }
+    packaging {
+        resources.excludes += listOf(
+            "/META-INF/{AL2.0,LGPL2.1}",
+            "/META-INF/*.version",
+            "DebugProbesKt.bin",
+            "kotlin-tooling-metadata.json",
+        )
+    }
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
