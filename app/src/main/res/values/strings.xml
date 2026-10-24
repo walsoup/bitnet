@@ -1,36 +1,75 @@
 <resources>
     <string name="app_name">BlueNet</string>
-    <string name="app_tagline">Bluetooth Mesh Network</string>
-    <string name="status_offline">Mesh Idle</string>
-    <string name="status_scanning">Scanning for peers…</string>
-    <string name="status_sharing">Sharing Internet</string>
-    <string name="status_connected">Connected to Mesh Peer</string>
-    <string name="share_internet_title">Share My Internet</string>
-    <string name="share_internet_subtitle">Allow nearby mesh peers to use your internet connection</string>
-    <string name="nearby_peers_title">Nearby Peers</string>
-    <string name="no_peers_found">Scanning for nearby BlueNet peers…</string>
-    <string name="btn_connect">Connect</string>
-    <string name="btn_disconnect">Disconnect</string>
-    <string name="chip_sharing">Sharing Internet</string>
-    <string name="chip_peers_count">%d peers</string>
-    <string name="connected_to">Connected to %s</string>
-    <string name="sharing_on_psm">Sharing on PSM: %d</string>
-    <string name="signal_strong">Strong signal (%d dBm)</string>
-    <string name="signal_medium">Medium signal (%d dBm)</string>
-    <string name="signal_weak">Weak signal (%d dBm)</string>
-    <string name="traffic_tx">▲ Upload (TX)</string>
-    <string name="traffic_rx">▼ Download (RX)</string>
-    <string name="compat_mode_title">Compatibility Mode (RFCOMM Force)</string>
-    <string name="compat_mode_subtitle">Use for older Bluetooth devices without L2CAP support</string>
-    <string name="auto_reconnect_title">Auto-Reconnect on Disconnect</string>
-    <string name="auto_reconnect_subtitle">Automatically retry connection if Bluetooth link drops</string>
-    <string name="no_paired_devices">No paired Bluetooth devices found</string>
-    <string name="refresh_devices">Refresh List</string>
-    <string name="host_mac_label">Host Device MAC Address</string>
-    <string name="select_device_label">Quick Connect (Paired Device)</string>
-    <string name="enter_mac_label">Manual Connection</string>
-    <string name="btn_copy_mac">Copy Info</string>
-    <string name="copied_to_clipboard">Copied info to clipboard!</string>
-    <string name="tile_share_internet">Share Internet</string>
-    <string name="tile_mesh_connect">Mesh Connect</string>
+
+    <string name="tile_share">Share internet</string>
+    <string name="tile_connect">Mesh internet</string>
+
+    <string name="status_starting">Starting mesh…</string>
+    <string name="status_running">Mesh active</string>
+    <string name="status_stopped">Mesh stopped</string>
+    <string name="status_bluetooth_off">Bluetooth is off</string>
+    <string name="status_permissions">Bluetooth permissions needed</string>
+    <string name="status_no_bluetooth">This device has no Bluetooth</string>
+    <string name="status_unsupported">Limited Bluetooth support</string>
+    <string name="status_unsupported_detail">This device can\'t host BLE links, so it only connects outwards</string>
+
+    <string name="you_are">You are %1$s</string>
+    <string name="stat_nearby">Nearby</string>
+    <string name="stat_linked">Linked</string>
+    <string name="stat_id">Your ID</string>
+
+    <string name="this_phone_title">This phone</string>
+    <string name="edit_name_title">Display name</string>
+    <string name="edit_name_hint">Shown to nearby peers, up to 32 characters</string>
+    <string name="share_title">Share my internet</string>
+    <string name="share_subtitle">Let nearby peers route their traffic through this phone</string>
+    <string name="share_active">Sharing with %1$d connected peer(s)</string>
+    <string name="share_blocked_while_connected">Disconnect from your sharer first</string>
+
+    <string name="tunnel_title">Mesh internet</string>
+    <string name="tunnel_connecting">Connecting to %1$s…</string>
+    <string name="tunnel_connected">Connected through %1$s</string>
+    <string name="tunnel_reconnecting">Link lost, reconnecting (%1$d/%2$d)…</string>
+    <string name="tunnel_failed">Couldn\'t connect: %1$s</string>
+    <string name="tunnel_flows">%1$d flows</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="connect_blocked_while_sharing">Turn off sharing to use someone else\'s internet</string>
+
+    <string name="nearby_title">Nearby</string>
+    <string name="broadcast_chat">Everyone</string>
+    <string name="broadcast_chat_subtitle">Broadcast to the whole mesh</string>
+    <string name="no_peers">Looking for BlueNet devices nearby…</string>
+    <string name="peer_use_internet">Use internet</string>
+    <string name="peer_nearby">In range</string>
+    <string name="peer_sharing">Sharing internet</string>
+    <string name="peer_linked">Linked</string>
+    <string name="peer_hops">%1$d hops</string>
+    <string name="peer_signal">%1$d dBm</string>
+    <string name="peer_via_mesh">Reachable through the mesh</string>
+    <string name="peer_out_of_range">Not in range · messages are relayed if a path exists</string>
+
+    <string name="chat_hint">Message</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_empty">No messages yet. Messages hop across up to 7 devices.</string>
+    <string name="chat_delivered">Delivered</string>
+    <string name="chat_sent">Sent</string>
+    <string name="chat_via_hops">via %1$d hops</string>
+    <string name="chat_unreachable">No nearby device is linked yet, so messages can\'t leave this phone.</string>
+
+    <string name="permission_title">Bluetooth access</string>
+    <string name="permission_rationale">Needed to find and connect to nearby devices</string>
+    <string name="permission_denied">Bluetooth permissions were denied</string>
+    <string name="grant">Grant</string>
+    <string name="enable_bluetooth">Turn on</string>
+    <string name="vpn_denied">VPN permission is needed to use a peer\'s internet</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="back">Back</string>
+
+    <string name="notification_channel">Mesh status</string>
+    <string name="notification_title">BlueNet mesh is running</string>
+    <string name="notification_sharing">Sharing internet · %1$d linked</string>
+    <string name="notification_idle">%1$d nearby · %2$d linked</string>
+    <string name="notification_stop">Stop</string>
 </resources>

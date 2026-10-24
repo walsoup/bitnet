@@ -4,16 +4,11 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Bluetooth Symbol -->
     <path
         android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
+        android:strokeColor="#FAF9F6"
         android:strokeWidth="5"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M 44,32 L 64,52 L 54,62 L 54,22 L 64,32 L 44,52" />
-    <!-- Speed Bolt Accent -->
-    <path
-        android:fillColor="#64B5F6"
-        android:pathData="M 68,48 L 56,66 H 64 L 52,86 L 72,62 H 62 Z" />
+        android:pathData="M42,43 L66,65 L54,76 L54,32 L66,43 L42,65" />
 </vector>

@@ -21,9 +21,10 @@
   @SuppressLint("MissingPermission", "NotificationPermission")
   ```
 
-### 3. Material Design 3 Attribute Naming
-- **Constraint:** Using incorrect or shortened Material theme attribute resource IDs (like `?attr/onPrimaryContainer` instead of `?attr/colorOnPrimaryContainer`) will fail resource linking at build time.
-- **Rule:** Always use the full M3 attribute names (e.g., `?attr/colorOnPrimaryContainer`, `?attr/colorPrimaryContainer`, `?attr/colorOnSurfaceVariant`).
+### 3. UI and Theme
+UI: build every screen with the Linen design system; follow design/AGENTS.md.
+- **Constraint:** Screens are Jetpack Compose wrapped in `LinenTheme`. The XML `Theme.BlueNet` only styles the window.
+- **Rule:** Take colors from `Linen.colors`, type from `Linen.type` and spacing from `LinenDimens`. Code that can't use Compose (notifications, tiles) uses `LinenPalette`. Don't add hex colors or a color scheme under `app/`; the launcher icon is the one exception.
 
 ## Git and Workspace Management Rules
 
