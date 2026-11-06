@@ -26,6 +26,18 @@ class PeerDirectoryTest {
     }
 
     @Test
+    fun linkedSharerStaysUsableAfterTheBleSightingExpires() {
+        val peer = PeerDirectory.merge(
+            nearby = emptyList(),
+            contacts = listOf(Contact(a, "Wal", isSharingInternet = true, hops = 1, lastSeenMs = 0)),
+            linked = setOf(a),
+        ).single()
+        assertFalse(peer.nearby)
+        assertTrue(peer.linked)
+        assertTrue("A live link is direct range, even when advertisements have gone quiet", peer.canProvideInternet)
+    }
+
+    @Test
     fun remoteSharerCannotProvideInternet() {
         val peer = PeerDirectory.merge(emptyList(), listOf(Contact(b, "far", true, hops = 3, lastSeenMs = 0)), emptySet()).single()
         assertTrue(peer.isSharingInternet)

@@ -18,6 +18,7 @@ import com.bluenet.core.tunnel.FrameSender
 import com.bluenet.core.tunnel.PacketWriter
 import com.bluenet.core.tunnel.TunnelClient
 import com.bluenet.core.tunnel.TunnelFrame
+import com.bluenet.core.tunnel.TunnelReconnect
 import com.bluenet.link.TunnelEndpoint
 import com.bluenet.node.MeshNode
 import com.bluenet.node.MeshRuntime
@@ -36,8 +37,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Routes this device's IPv4 traffic through a nearby peer that shares its internet.
  *
  * The TUN interface feeds a [TunnelClient]; its frames ride the [SecureLink] to the sharer. If the
- * link drops, open flows are reset and the link is re-established a few times before giving up.
- * IPv6 is deliberately not configured, which makes Android block it instead of leaking it.
+ * link drops, open flows are reset and the link is dialed again. A session that was already up
+ * keeps trying for a few minutes; the first connection gives up after a few failures. IPv6 is
+ * deliberately not configured, which makes Android block it instead of leaking it.
  */
 class BlueNetVpnService : VpnService() {
     private val main = Handler(Looper.getMainLooper())
@@ -99,7 +101,7 @@ class BlueNetVpnService : VpnService() {
 
         private val client = TunnelClient(
             tun = PacketWriter { packet -> writeTun(packet) },
-            link = FrameSender { frame -> link?.send(Channels.TUNNEL_UP, frame.encode()) ?: false },
+            link = FrameSender { frame -> node.sendOnLink(peerId, Channels.TUNNEL_UP, frame.encode()) },
             executor = loop,
         )
 
@@ -156,13 +158,19 @@ class BlueNetVpnService : VpnService() {
 
             var attempt = 0
             var connectedOnce = false
+            var reconnectDeadline = 0L
             while (!stopped.get()) {
                 publish(if (connectedOnce) State.RECONNECTING else State.CONNECTING, attempt)
                 val next = node.linkTo(peerId)
                 if (next == null) {
                     attempt++
-                    if (attempt >= MAX_ATTEMPTS) return "${peerName()} is out of range"
-                    sleepUnlessStopped(RETRY_DELAY_MS * attempt)
+                    if (connectedOnce && reconnectDeadline == 0L) {
+                        reconnectDeadline = System.currentTimeMillis() + TunnelReconnect.RECONNECT_BUDGET_MS
+                    }
+                    if (TunnelReconnect.shouldGiveUp(connectedOnce, attempt, System.currentTimeMillis(), reconnectDeadline)) {
+                        return "${peerName()} is out of range"
+                    }
+                    sleepUnlessStopped(RETRY_DELAY_MS * attempt.coerceAtMost(TunnelReconnect.MAX_INITIAL_FAILURES))
                     continue
                 }
                 if (tun == null) {
@@ -178,14 +186,21 @@ class BlueNetVpnService : VpnService() {
                     continue
                 }
                 attempt = 0
+                reconnectDeadline = 0L
                 connectedOnce = true
                 node.lastSharerId = peerId
                 Log.d(TAG, "Tunnel up through ${peerId.take(6)}")
                 while (!stopped.get() && !linkLost.await(STATS_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
-                    publish(State.CONNECTED, 0, next)
+                    val live = node.linkedPeer(peerId)
+                    if (live != null && live !== link) {
+                        bytesUpBefore += link?.bytesSent ?: 0
+                        bytesDownBefore += link?.bytesReceived ?: 0
+                        link = live
+                    }
+                    publish(State.CONNECTED, 0, link)
                 }
-                bytesUpBefore += next.bytesSent
-                bytesDownBefore += next.bytesReceived
+                bytesUpBefore += link?.bytesSent ?: 0
+                bytesDownBefore += link?.bytesReceived ?: 0
                 link = null
                 client.resetAll()
             }
@@ -297,7 +312,7 @@ class BlueNetVpnService : VpnService() {
         private const val STATS_INTERVAL_MS = 1_000L
         private const val RETRY_DELAY_MS = 2_000L
         private const val MESH_START_TIMEOUT_MS = 5_000L
-        const val MAX_ATTEMPTS = 5
+        const val MAX_ATTEMPTS = TunnelReconnect.MAX_INITIAL_FAILURES
 
         /** Connects through [peerId]. The caller must already have VPN consent from [VpnService.prepare]. */
         fun connect(context: Context, peerId: String) {

@@ -180,10 +180,7 @@ class TunnelClient(
                 flow.rto = INITIAL_RTO_MS
                 flow.lastTransmit = clock()
                 flow.pendingGrant += dataAcked
-                if (flow.pendingGrant >= TunnelFrame.GRANT_THRESHOLD) {
-                    link.send(TunnelFrame.window(flow.streamId, flow.pendingGrant))
-                    flow.pendingGrant = 0
-                }
+                if (flow.pendingGrant >= TunnelFrame.GRANT_THRESHOLD) flushGrant(flow)
             }
             flow.appWindow = segment.window
         }
@@ -194,32 +191,39 @@ class TunnelClient(
             needAck = true
             val alreadyReceived = flow.rcvNxt - segment.seq
             if (alreadyReceived >= 0 && alreadyReceived < payload.size && !flow.appFinished) {
-                val accepted = minOf(payload.size - alreadyReceived, flow.upstreamCredit)
+                val room = minOf(payload.size - alreadyReceived, flow.upstreamCredit)
                 var offset = alreadyReceived
-                val end = alreadyReceived + accepted
+                val end = alreadyReceived + room
+                var forwarded = 0
                 while (offset < end) {
                     val chunk = minOf(end - offset, TunnelFrame.MAX_DATA)
-                    link.send(TunnelFrame.data(flow.streamId, payload.copyOfRange(offset, offset + chunk)))
+                    if (!link.send(TunnelFrame.data(flow.streamId, payload.copyOfRange(offset, offset + chunk)))) break
                     offset += chunk
+                    forwarded += chunk
                 }
-                flow.rcvNxt += accepted
-                flow.upstreamCredit -= accepted
+                flow.rcvNxt += forwarded
+                flow.upstreamCredit -= forwarded
             }
         }
 
         if (segment.has(TcpSegment.FIN)) {
             // A retransmitted FIN means our ACK was lost, so it must be acknowledged again.
             needAck = true
-            if (!flow.appFinished && segment.seq + payload.size == flow.rcvNxt) {
+            if (!flow.appFinished && segment.seq + payload.size == flow.rcvNxt && link.send(TunnelFrame.fin(flow.streamId))) {
                 flow.rcvNxt += 1
                 flow.appFinished = true
-                link.send(TunnelFrame.fin(flow.streamId))
             }
         }
 
         if (needAck) sendAck(flow)
         pump(flow)
         finishIfDone(flow)
+    }
+
+    /** Returns download credit to the sharer. A failed send keeps the grant queued for [tick]. */
+    private fun flushGrant(flow: TcpFlow) {
+        if (flow.pendingGrant <= 0) return
+        if (link.send(TunnelFrame.window(flow.streamId, flow.pendingGrant))) flow.pendingGrant = 0
     }
 
     /** Sends as much buffered sharer data as the app's window allows, then our FIN if due. */
@@ -372,6 +376,7 @@ class TunnelClient(
 
     private fun handleTick(now: Long) {
         for (flow in tcpById.values.toList()) {
+            flushGrant(flow)
             when (flow.state) {
                 State.OPENING -> if (now - flow.openedAt > OPEN_TIMEOUT_MS) abort(flow, notifyHost = true)
                 State.SYN_RECEIVED, State.ESTABLISHED -> retransmitIfDue(flow, now)

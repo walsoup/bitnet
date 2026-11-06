@@ -29,6 +29,19 @@ class BleAnnouncementTest {
     }
 
     @Test
+    fun dialPayloadFitsTheAdvertisementBesideTheServiceUuid() {
+        val announcement = BleAnnouncement("0123456789abcdef", true, 0x00C1, "Zoë's phone 📱📱")
+        val dial = announcement.dialPayload()
+        val decoded = BleAnnouncement.decode(dial)!!
+        assertEquals(announcement.peerId, decoded.peerId)
+        assertEquals(announcement.psm, decoded.psm)
+        assertEquals(announcement.isSharingInternet, decoded.isSharingInternet)
+        assertEquals("", decoded.name)
+        // Flags (3) + 16-bit service UUID (4) + manufacturer AD header (4) + payload.
+        assertTrue(3 + 4 + 4 + dial.size <= 31)
+    }
+
+    @Test
     fun rejectsMalformedPayloads() {
         val valid = BleAnnouncement("0123456789abcdef", false, 200, "x").encode()
         assertNull(BleAnnouncement.decode(null))

@@ -18,6 +18,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class SecureLinkTest {
 
@@ -129,5 +130,115 @@ class SecureLinkTest {
         assertTrue(listener.closed.await(5, TimeUnit.SECONDS))
         assertFalse(bobLink.isOpen)
         assertTrue(listener.records.isEmpty())
+    }
+
+    @Test
+    fun idleTimeoutFollowsTheMonotonicClock() {
+        var now = 1_000_000_000L
+        val alice = Identity.generate()
+        val bob = Identity.generate()
+        val (a, b) = socketPair()
+        val config = SecureLink.Config(
+            keepAliveIntervalMs = 60_000,
+            idleTimeoutMs = 5_000,
+            monotonicNowNanos = { now },
+        )
+        val bobSide = executor.submit<SecureLink> { SecureLink.accept(b, bob, config) }
+        val aliceLink = SecureLink.connect(a, alice, expectedPeerId = bob.peerId)
+        val bobLink = bobSide.get(10, TimeUnit.SECONDS)
+        val listener = RecordingListener()
+        bobLink.start(listener)
+        aliceLink.start(RecordingListener())
+        try {
+            now += 4_000_000_000L
+            bobLink.checkKeepAlive()
+            assertTrue(bobLink.isOpen)
+
+            now += 2_000_000_000L
+            bobLink.checkKeepAlive()
+            assertFalse(bobLink.isOpen)
+            assertTrue(listener.closed.await(2, TimeUnit.SECONDS))
+        } finally {
+            aliceLink.close()
+            bobLink.close()
+        }
+    }
+
+    @Test
+    fun sendReturnsWhenTheQueueIsFullInsteadOfBlocking() {
+        val alice = Identity.generate()
+        val bob = Identity.generate()
+        val (a, b, gate) = gatedPair()
+        val config = SecureLink.Config(sendQueueCapacity = 1, keepAliveIntervalMs = 60_000, idleTimeoutMs = 60_000)
+
+        val bobSide = executor.submit<SecureLink> { SecureLink.accept(b, bob, config) }
+        val aliceLink = SecureLink.connect(a, alice, expectedPeerId = bob.peerId, config = config)
+        val bobLink = bobSide.get(10, TimeUnit.SECONDS)
+        bobLink.start(RecordingListener())
+        aliceLink.start(RecordingListener())
+        gate.block = true
+        try {
+            val started = System.nanoTime()
+            val results = (0 until 6).map { bobLink.send(Channels.MESH, byteArrayOf(it.toByte())) }
+            val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+            assertTrue(results.any { !it })
+            assertTrue("send blocked for ${elapsedMs}ms", elapsedMs < 1_000)
+            assertFalse(bobLink.isOpen)
+        } finally {
+            gate.release()
+            aliceLink.close()
+            bobLink.close()
+        }
+    }
+
+    private class GatedOutputStream(private val inner: OutputStream) : OutputStream() {
+        private val open = AtomicBoolean(true)
+        @Volatile var block = false
+        fun release() {
+            block = false
+        }
+        override fun write(b: Int) {
+            await()
+            inner.write(b)
+        }
+        override fun write(b: ByteArray, off: Int, len: Int) {
+            await()
+            inner.write(b, off, len)
+        }
+        override fun flush() {
+            await()
+            inner.flush()
+        }
+        override fun close() {
+            open.set(false)
+            block = false
+            inner.close()
+        }
+        private fun await() {
+            while (block && open.get()) {
+                try {
+                    Thread.sleep(10)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return
+                }
+            }
+        }
+    }
+
+    private fun gatedPair(): Triple<LinkTransport, LinkTransport, GatedOutputStream> {
+        ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { server ->
+            val client = Socket(InetAddress.getLoopbackAddress(), server.localPort)
+            val accepted = server.accept()
+            sockets += client
+            sockets += accepted
+            val gate = GatedOutputStream(accepted.getOutputStream())
+            val acceptedTransport = object : LinkTransport {
+                override val input: InputStream = accepted.getInputStream()
+                override val output: OutputStream = gate
+                override fun close() = accepted.close()
+            }
+            return Triple(SocketTransport(client), acceptedTransport, gate)
+        }
     }
 }

@@ -5,6 +5,8 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothServerSocket
 import android.bluetooth.BluetoothSocket
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 import com.bluenet.core.Log
 import com.bluenet.core.crypto.Identity
 import com.bluenet.core.link.Channels
@@ -44,12 +46,16 @@ class LinkManager(
     private val onMeshPacket: (bytes: ByteArray, fromPeerId: String) -> Unit,
     private val onLinkOpened: (peerId: String) -> Unit,
     private val tunnelEndpoint: (peerId: String) -> TunnelEndpoint?,
+    private val onListening: (psm: Int) -> Unit = {},
 ) {
     private class Entry(val link: SecureLink) {
         @Volatile var host: TunnelHost? = null
     }
 
     private val lock = Any()
+    private val listenLock = Any()
+    private val running = AtomicBoolean(false)
+    private var acceptThread: Thread? = null
     private val entries = HashMap<String, Entry>()
     private val pending = ConcurrentHashMap<String, CompletableFuture<SecureLink?>>()
     private val pool: ExecutorService = Executors.newCachedThreadPool { r ->
@@ -71,26 +77,32 @@ class LinkManager(
             if (!value) synchronized(lock) { entries.values.toList() }.forEach { closeHost(it) }
         }
 
-    /** Opens the L2CAP server socket. Returns false if this device cannot accept links. */
-    fun start(): Boolean {
-        if (server != null) return true
-        val socket = try {
-            adapter.listenUsingInsecureL2capChannel()
-        } catch (e: Exception) {
-            Log.e(TAG, "Could not open L2CAP server", e)
-            return false
+    /**
+     * Opens the L2CAP server socket, or reopens it after the accept loop has died.
+     * Returns false if this device cannot accept links right now.
+     */
+    fun start(): Boolean = ensureListening()
+
+    /** Restarts listening when the server socket has dropped. Safe to call while already up. */
+    fun ensureListening(): Boolean {
+        running.set(true)
+        val listening = synchronized(listenLock) {
+            if (server == null) openServerLocked()
+            server != null
         }
-        server = socket
-        psm = socket.psm
-        Thread({ acceptLoop(socket) }, "link-accept").apply { isDaemon = true; start() }
-        Log.d(TAG, "Listening on PSM $psm")
-        return true
+        if (listening) ensureAcceptThread()
+        return listening
     }
 
     fun stop() {
-        server?.let { try { it.close() } catch (_: IOException) {} }
-        server = null
-        psm = 0
+        running.set(false)
+        val current = synchronized(listenLock) {
+            server.also {
+                server = null
+                psm = 0
+            }
+        }
+        current?.let { try { it.close() } catch (_: IOException) {} }
         val all = synchronized(lock) { entries.values.toList().also { entries.clear() } }
         all.forEach {
             closeHost(it)
@@ -142,44 +154,114 @@ class LinkManager(
 
     private fun dial(peerId: String, device: BluetoothDevice, psm: Int): SecureLink? {
         val socket = try {
-            device.createInsecureL2capChannel(psm).also { it.connect() }
+            device.createInsecureL2capChannel(psm)
         } catch (e: Exception) {
             Log.d(TAG, "L2CAP connect to ${peerId.take(6)} failed: ${e.message}")
+            return null
+        }
+        try {
+            connectSocket(socket)
+        } catch (e: Exception) {
+            Log.d(TAG, "L2CAP connect to ${peerId.take(6)} failed: ${e.message}")
+            closeQuietly(socket)
             return null
         }
         val link = try {
             SecureLink.connect(SocketTransport(socket), identity, expectedPeerId = peerId)
         } catch (e: Exception) {
             Log.w(TAG, "Handshake with ${peerId.take(6)} failed: ${e.message}")
+            closeQuietly(socket)
             return null
         }
         return register(link)
     }
 
-    private fun acceptLoop(serverSocket: BluetoothServerSocket) {
-        while (server === serverSocket) {
-            val socket = try {
-                serverSocket.accept()
+    /**
+     * [BluetoothSocket.connect] has no timeout of its own, and one stuck dial blocks every other
+     * auto-link. Close the socket when the wait expires so connect() unblocks.
+     */
+    private fun connectSocket(socket: BluetoothSocket) {
+        val task = pool.submit { socket.connect() }
+        try {
+            task.get(CONNECT_TIMEOUT_S, TimeUnit.SECONDS)
+        } catch (e: TimeoutException) {
+            task.cancel(true)
+            closeQuietly(socket)
+            throw IOException("timed out")
+        } catch (e: InterruptedException) {
+            task.cancel(true)
+            closeQuietly(socket)
+            Thread.currentThread().interrupt()
+            throw e
+        } catch (e: Exception) {
+            closeQuietly(socket)
+            throw e
+        }
+    }
+
+    private fun openServerLocked(): Boolean {
+        val socket = try {
+            adapter.listenUsingInsecureL2capChannel()
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not open L2CAP server", e)
+            return false
+        }
+        server = socket
+        psm = socket.psm
+        Log.d(TAG, "Listening on PSM $psm")
+        onListening(psm)
+        return true
+    }
+
+    private fun ensureAcceptThread() {
+        synchronized(listenLock) {
+            if (acceptThread?.isAlive == true) return
+            acceptThread = Thread(::acceptLoop, "link-accept").apply { isDaemon = true; start() }
+        }
+    }
+
+    private fun acceptLoop() {
+        while (running.get()) {
+            val socket = synchronized(listenLock) { server }
+            if (socket == null) {
+                val opened = synchronized(listenLock) {
+                    if (!running.get()) return
+                    if (server != null) true else openServerLocked()
+                }
+                if (!opened) break
+                continue
+            }
+            val accepted = try {
+                socket.accept()
             } catch (e: IOException) {
-                if (server === serverSocket) Log.w(TAG, "L2CAP accept failed", e)
+                if (!running.get()) break
+                Log.w(TAG, "L2CAP accept failed; reopening", e)
+                synchronized(listenLock) {
+                    if (server === socket) {
+                        server = null
+                        psm = 0
+                        try { socket.close() } catch (_: IOException) {}
+                        onListening(0)
+                    }
+                }
+                continue
+            }
+            if (!running.get()) {
+                try { accepted.close() } catch (_: IOException) {}
                 break
             }
             if (synchronized(lock) { entries.size } >= MAX_LINKS) {
-                try { socket.close() } catch (_: IOException) {}
+                try { accepted.close() } catch (_: IOException) {}
                 continue
             }
             pool.execute {
                 try {
-                    register(SecureLink.accept(SocketTransport(socket), identity))
+                    register(SecureLink.accept(SocketTransport(accepted), identity))
                 } catch (e: Exception) {
                     Log.w(TAG, "Inbound handshake failed: ${e.message}")
+                    closeQuietly(accepted)
                 }
             }
-        }
-        if (server === serverSocket) {
-            Log.w(TAG, "L2CAP server stopped unexpectedly")
-            server = null
-            psm = 0
         }
     }
 
@@ -194,14 +276,16 @@ class LinkManager(
                 return current.link
             }
             replaced = current
-            entries[peerId] = Entry(link)
+            val entry = Entry(link)
+            if (replaced != null) {
+                // Keep the sharer's sockets across a duplicate-link race. The host sends through
+                // whichever link is current, so flows don't die just because both phones dialed.
+                entry.host = synchronized(replaced) { replaced.host.also { replaced.host = null } }
+            }
+            entries[peerId] = entry
         }
         link.start(dispatcher)
-        if (replaced != null) {
-            closeHost(replaced)
-            replaced.link.closeGracefully()
-            tunnelEndpoint(peerId)?.onLinkClosed()
-        }
+        replaced?.link?.closeGracefully()
         publish()
         Log.d(TAG, "Link to ${peerId.take(6)} open (${if (link.initiatedLocally) "outbound" else "inbound"})")
         onLinkOpened(peerId)
@@ -252,7 +336,9 @@ class LinkManager(
             return
         }
         val host = entry.host ?: synchronized(entry) {
-            entry.host ?: TunnelHost({ link.send(Channels.TUNNEL_DOWN, it.encode()) }).also { entry.host = it }
+            entry.host ?: TunnelHost({ outbound ->
+                send(link.remotePeerId, Channels.TUNNEL_DOWN, outbound.encode())
+            }).also { entry.host = it }
         }
         host.onFrame(frame)
     }
@@ -275,6 +361,11 @@ class LinkManager(
     companion object {
         private const val TAG = "LinkManager"
         private const val MAX_LINKS = 8
-        private const val CONNECT_WAIT_S = 30L
+        private const val CONNECT_WAIT_S = 40L
+        private const val CONNECT_TIMEOUT_S = 15L
+
+        private fun closeQuietly(socket: BluetoothSocket) {
+            try { socket.close() } catch (_: IOException) {}
+        }
     }
 }

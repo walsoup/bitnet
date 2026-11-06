@@ -53,7 +53,10 @@ class BleDiscovery(
     private var running = false
     private var scanning = false
     private var advertising = false
+    private var advertiseEpoch = 0
     private var announcement: BleAnnouncement? = null
+
+    private val startAdvertisingTask = Runnable { if (running) startAdvertising() }
 
     private val evictTask = object : Runnable {
         override fun run() {
@@ -96,15 +99,23 @@ class BleDiscovery(
      */
     fun restartAdvertising() {
         if (!running) return
+        // stopAdvertising is asynchronous. Starting in the same call is often ignored, which
+        // leaves peers dialing a PSM we no longer listen on.
+        val epoch = ++advertiseEpoch
         stopAdvertising()
-        startAdvertising()
+        handler.removeCallbacks(startAdvertisingTask)
+        handler.postDelayed({
+            if (running && epoch == advertiseEpoch) startAdvertising()
+        }, ADVERTISE_RESTART_DELAY_MS)
     }
 
     fun stop() {
         if (!running) return
         running = false
+        advertiseEpoch++
         handler.removeCallbacks(evictTask)
         handler.removeCallbacks(refreshAdvertisingTask)
+        handler.removeCallbacks(startAdvertisingTask)
         stopScan()
         stopAdvertising()
         _sightings.value = emptyMap()
@@ -154,6 +165,7 @@ class BleDiscovery(
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .addServiceUuid(ParcelUuid(BleAnnouncement.SERVICE_UUID))
+            .addManufacturerData(BleAnnouncement.MANUFACTURER_ID, payload.dialPayload())
             .build()
         val scanResponse = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
@@ -205,7 +217,11 @@ class BleDiscovery(
         }
 
         override fun onStartFailure(errorCode: Int) {
-            if (errorCode == ADVERTISE_FAILED_ALREADY_STARTED) return
+            if (errorCode == ADVERTISE_FAILED_ALREADY_STARTED) {
+                advertising = false
+                if (running) handler.postDelayed(startAdvertisingTask, ADVERTISE_RESTART_DELAY_MS)
+                return
+            }
             Log.w(TAG, "Advertising failed with error $errorCode")
             advertising = false
             _advertiseState.value =
@@ -219,5 +235,6 @@ class BleDiscovery(
         private const val EVICT_INTERVAL_MS = 10_000L
         private const val SCAN_RETRY_MS = 30_000L
         private const val ADVERTISE_REFRESH_MS = 120_000L
+        private const val ADVERTISE_RESTART_DELAY_MS = 300L
     }
 }
