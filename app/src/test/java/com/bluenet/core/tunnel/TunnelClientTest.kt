@@ -21,13 +21,22 @@ class TunnelClientTest {
     private var now = 0L
     private val tunOut = ArrayDeque<ByteArray>()
     private val frames = ArrayDeque<TunnelFrame>()
+    private var dropData = false
+    private var dropWindows = false
     private lateinit var client: TunnelClient
 
     @Before
     fun setUp() {
+        dropData = false
+        dropWindows = false
         client = TunnelClient(
             tun = { tunOut.addLast(it) },
-            link = { frames.addLast(it); true },
+            link = { frame ->
+                if (dropData && frame.type == TunnelFrame.DATA) return@TunnelClient false
+                if (dropWindows && frame.type == TunnelFrame.WINDOW) return@TunnelClient false
+                frames.addLast(frame)
+                true
+            },
             executor = { it.run() },
             clock = { now },
         )
@@ -229,6 +238,38 @@ class TunnelClientTest {
         client.tick()
         assertEquals(TunnelFrame.RESET, frames.removeFirst().type)
         assertEquals(0, client.openUdpFlows)
+    }
+
+    @Test
+    fun rejectedUploadIsNotAcknowledgedAndIsRetriedByTheApp() {
+        val (_, iss) = handshake()
+        val hello = "hello".toByteArray()
+        dropData = true
+        app(appIss + 1, iss + 1, TcpSegment.ACK or TcpSegment.PSH, hello)
+        assertEquals("App must retransmit bytes the link did not take", appIss + 1, nextTcp().ack)
+        assertTrue(frames.none { it.type == TunnelFrame.DATA })
+
+        dropData = false
+        app(appIss + 1, iss + 1, TcpSegment.ACK or TcpSegment.PSH, hello)
+        val data = frames.first { it.type == TunnelFrame.DATA }
+        assertArrayEquals(hello, data.payload)
+        assertEquals(appIss + 1 + hello.size, nextTcp().ack)
+    }
+
+    @Test
+    fun creditGrantIsRetriedOnTheNextTickWhenTheSendFails() {
+        val (stream, iss) = handshake()
+        val chunk = ByteArray(TunnelFrame.MAX_DATA)
+        repeat(3) { client.onFrame(TunnelFrame.data(stream, chunk)) }
+        tunOut.clear()
+        dropWindows = true
+        app(appIss + 1, iss + 1 + chunk.size * 3, TcpSegment.ACK)
+        assertTrue(frames.none { it.type == TunnelFrame.WINDOW })
+
+        dropWindows = false
+        client.tick()
+        val grant = frames.single { it.type == TunnelFrame.WINDOW }
+        assertEquals(chunk.size * 3, grant.windowIncrement)
     }
 
     @Test

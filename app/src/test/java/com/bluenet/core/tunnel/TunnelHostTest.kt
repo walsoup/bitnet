@@ -42,6 +42,33 @@ class TunnelHostTest {
     }
 
     @Test
+    fun uploadCreditIsStillGrantedWhenTheFirstWindowSendFails() {
+        val port = echoServer()
+        var windowAttempts = 0
+        val host = TunnelHost(link = { frame ->
+            if (frame.type == TunnelFrame.WINDOW) {
+                windowAttempts++
+                if (windowAttempts == 1) return@TunnelHost false
+            }
+            frames.put(frame)
+            true
+        }, policy = DestinationPolicy.ALLOW_ALL).also { closeables += AutoCloseable { it.close() } }
+
+        host.onFrame(TunnelFrame.openTcp(1, loopback, port))
+        assertEquals(TunnelFrame.OPEN_OK, nextFrame().type)
+        val chunk = ByteArray(16 * 1024)
+        repeat(3) { host.onFrame(TunnelFrame.data(1, chunk)) }
+
+        val deadline = System.currentTimeMillis() + 5_000
+        var grant: TunnelFrame? = null
+        while (System.currentTimeMillis() < deadline && grant == null) {
+            val frame = frames.poll(200, TimeUnit.MILLISECONDS) ?: continue
+            if (frame.type == TunnelFrame.WINDOW) grant = frame
+        }
+        assertEquals("Sharer must return upload credit after a dropped WINDOW", 3 * chunk.size, grant?.windowIncrement)
+    }
+
+    @Test
     fun dataSentWhileConnectingIsDeliveredInOrder() {
         val port = echoServer()
         val host = host()

@@ -148,12 +148,24 @@ class TunnelHost(
             try {
                 socket.getOutputStream().write(bytes)
                 pendingGrant += bytes.size
-                if (pendingGrant >= TunnelFrame.GRANT_THRESHOLD) {
-                    link.send(TunnelFrame.window(id, pendingGrant))
-                    pendingGrant = 0
-                }
+                flushGrant()
             } catch (e: IOException) {
                 fail()
+            }
+        }
+
+        /**
+         * Upload credit has to reach the client or its window stays shut. A send can fail while
+         * the link is being replaced; retry a few times on this stream's writer without forgetting
+         * the bytes already written to the socket.
+         */
+        private fun flushGrant(retriesLeft: Int = GRANT_RETRIES) {
+            if (aborted.get() || pendingGrant < TunnelFrame.GRANT_THRESHOLD) return
+            val amount = pendingGrant
+            if (link.send(TunnelFrame.window(id, amount))) {
+                pendingGrant -= amount
+            } else if (retriesLeft > 0) {
+                writes.execute { flushGrant(retriesLeft - 1) }
             }
         }
 
@@ -281,5 +293,6 @@ class TunnelHost(
 
     companion object {
         private const val TAG = "TunnelHost"
+        private const val GRANT_RETRIES = 3
     }
 }

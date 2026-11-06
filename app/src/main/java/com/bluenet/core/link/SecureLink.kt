@@ -56,6 +56,8 @@ class SecureLink private constructor(
         val idleTimeoutMs: Long = 20_000,
         val sendQueueCapacity: Int = 4_096,
         val handshakeTimeoutMs: Long = 15_000,
+        /** Monotonic clock. Wall time jumps must not look like an idle link. */
+        val monotonicNowNanos: () -> Long = System::nanoTime,
     )
 
     interface Listener {
@@ -69,8 +71,8 @@ class SecureLink private constructor(
     private val open = AtomicBoolean(true)
     private val queue = LinkedBlockingQueue<ByteArray>(config.sendQueueCapacity)
     @Volatile private var listener: Listener? = null
-    @Volatile private var lastReceivedAt = System.currentTimeMillis()
-    @Volatile private var lastSentAt = System.currentTimeMillis()
+    @Volatile private var lastReceivedAt = config.monotonicNowNanos()
+    @Volatile private var lastSentAt = config.monotonicNowNanos()
     private var writerThread: Thread? = null
     private var keepAlive: ScheduledFuture<*>? = null
 
@@ -82,6 +84,9 @@ class SecureLink private constructor(
 
     fun start(listener: Listener) {
         this.listener = listener
+        val now = config.monotonicNowNanos()
+        lastReceivedAt = now
+        lastSentAt = now
         if (!open.get()) {
             listener.onClosed(this, IOException("Link closed before start"))
             return
@@ -140,14 +145,14 @@ class SecureLink private constructor(
         val ciphertext = session.sendCipher.seal(plaintext)
         output.writeInt(ciphertext.size)
         output.write(ciphertext)
-        lastSentAt = System.currentTimeMillis()
+        lastSentAt = config.monotonicNowNanos()
     }
 
     private fun readLoop() {
         try {
             while (open.get()) {
                 val plaintext = readRecord(input, session.receiveCipher)
-                lastReceivedAt = System.currentTimeMillis()
+                lastReceivedAt = config.monotonicNowNanos()
                 val channel = plaintext[0].toInt() and 0xFF
                 val body = plaintext.copyOfRange(1, plaintext.size)
                 if (channel == Channels.CONTROL) {
@@ -170,12 +175,13 @@ class SecureLink private constructor(
         }
     }
 
-    private fun checkKeepAlive() {
+    internal fun checkKeepAlive() {
         if (!open.get()) return
-        val now = System.currentTimeMillis()
-        if (now - lastReceivedAt > config.idleTimeoutMs) {
-            close(IOException("Link idle for ${now - lastReceivedAt} ms"))
-        } else if (now - lastSentAt >= config.keepAliveIntervalMs) {
+        val now = config.monotonicNowNanos()
+        val idleNs = (now - lastReceivedAt).coerceAtLeast(0)
+        if (idleNs > config.idleTimeoutMs * 1_000_000L) {
+            close(IOException("Link idle for ${idleNs / 1_000_000} ms"))
+        } else if (now - lastSentAt >= config.keepAliveIntervalMs * 1_000_000L) {
             send(Channels.CONTROL, byteArrayOf(CONTROL_PING))
         }
     }

@@ -18,6 +18,13 @@ data class BleAnnouncement(
     val psm: Int,
     val name: String,
 ) {
+    /**
+     * Manufacturer payload for the primary advertisement: peer id, sharing flag and PSM, without
+     * the name. Scan responses are dropped much more often than advertisements, and a peer that
+     * never sees the PSM cannot dial.
+     */
+    fun dialPayload(): ByteArray = copy(name = "").encode()
+
     fun encode(): ByteArray {
         val nameBytes = MeshPayloads.truncateUtf8(name, MAX_NAME_BYTES)
         val out = ByteArray(FIXED_SIZE + nameBytes.size)

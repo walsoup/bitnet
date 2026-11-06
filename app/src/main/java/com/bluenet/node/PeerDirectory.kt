@@ -15,8 +15,11 @@ data class Peer(
 ) {
     val nearby: Boolean get() = rssi != null
 
-    /** Tunnels are single-hop, so only a sharer in direct range can carry our traffic. */
-    val canProvideInternet: Boolean get() = nearby && isSharingInternet
+    /**
+     * Tunnels are single-hop. A live link is direct range even when the BLE advertisement has
+     * gone quiet; a sharer known only through mesh relays is not.
+     */
+    val canProvideInternet: Boolean get() = (nearby || linked) && isSharingInternet
 }
 
 /** A peer seen in direct BLE range. */

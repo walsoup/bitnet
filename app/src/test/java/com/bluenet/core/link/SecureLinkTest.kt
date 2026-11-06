@@ -133,6 +133,38 @@ class SecureLinkTest {
     }
 
     @Test
+    fun idleTimeoutFollowsTheMonotonicClock() {
+        var now = 1_000_000_000L
+        val alice = Identity.generate()
+        val bob = Identity.generate()
+        val (a, b) = socketPair()
+        val config = SecureLink.Config(
+            keepAliveIntervalMs = 60_000,
+            idleTimeoutMs = 5_000,
+            monotonicNowNanos = { now },
+        )
+        val bobSide = executor.submit<SecureLink> { SecureLink.accept(b, bob, config) }
+        val aliceLink = SecureLink.connect(a, alice, expectedPeerId = bob.peerId)
+        val bobLink = bobSide.get(10, TimeUnit.SECONDS)
+        val listener = RecordingListener()
+        bobLink.start(listener)
+        aliceLink.start(RecordingListener())
+        try {
+            now += 4_000_000_000L
+            bobLink.checkKeepAlive()
+            assertTrue(bobLink.isOpen)
+
+            now += 2_000_000_000L
+            bobLink.checkKeepAlive()
+            assertFalse(bobLink.isOpen)
+            assertTrue(listener.closed.await(2, TimeUnit.SECONDS))
+        } finally {
+            aliceLink.close()
+            bobLink.close()
+        }
+    }
+
+    @Test
     fun sendReturnsWhenTheQueueIsFullInsteadOfBlocking() {
         val alice = Identity.generate()
         val bob = Identity.generate()

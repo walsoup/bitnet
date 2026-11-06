@@ -51,7 +51,8 @@ class TunnelEndToEndTest {
         var appAck = synAck.seq + 1
         send(appSegment(dst, port, appSeq, appAck, TcpSegment.ACK))
 
-        val request = ByteArray(200_000) { (it * 31).toByte() }
+        // Larger than the 256 KiB credit window, so a stuck WINDOW grant fails this test.
+        val request = ByteArray(400_000) { (it * 31).toByte() }
         var offset = 0
         val echoed = ByteArrayOutputStream()
         while (echoed.size() < request.size) {
