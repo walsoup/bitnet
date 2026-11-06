@@ -41,7 +41,6 @@ import com.bluenet.core.mesh.MeshPayloads
 import com.bluenet.node.MeshNode
 import com.bluenet.node.Peer
 import com.bluenet.node.TunnelStatus
-import com.bluenet.service.BlueNetVpnService
 import com.walsoup.linen.ActionButton
 import com.walsoup.linen.ActionStyle
 import com.walsoup.linen.EmptyState
@@ -236,7 +235,7 @@ private fun TunnelSection(tunnel: TunnelStatus, onDisconnect: () -> Unit) {
                 TunnelStatus.State.CONNECTING -> stringResource(R.string.tunnel_connecting, name)
                 TunnelStatus.State.CONNECTED -> stringResource(R.string.tunnel_connected, name)
                 TunnelStatus.State.RECONNECTING ->
-                    stringResource(R.string.tunnel_reconnecting, tunnel.attempt + 1, BlueNetVpnService.MAX_ATTEMPTS)
+                    stringResource(R.string.tunnel_reconnecting, tunnel.attempt + 1)
                 TunnelStatus.State.FAILED -> stringResource(R.string.tunnel_failed, tunnel.error.orEmpty())
             },
             style = Linen.type.body,

@@ -11,7 +11,10 @@ import org.junit.Test
 class MeshRouterTest {
 
     /** In-memory mesh: nodes exchange packets synchronously over explicit neighbor edges. */
-    private class Network {
+    private class Network(
+        val clock: () -> Long = System::currentTimeMillis,
+        var dropAcks: Boolean = false,
+    ) {
         val nodes = LinkedHashMap<String, Node>()
         val edges = HashMap<String, MutableSet<String>>()
         var delivered = 0
@@ -36,13 +39,14 @@ class MeshRouterTest {
             override fun neighbors(): Set<String> = network.edges[id].orEmpty()
             override fun sendTo(peerId: String, packet: ByteArray): Boolean {
                 network.delivered++
+                if (network.dropAcks && MeshPacket.decode(packet)?.type == MeshPacket.TYPE_ACK) return true
                 network.byId(peerId).router.onPacket(packet, id)
                 return true
             }
             override fun broadcast(packet: ByteArray, exceptPeerId: String?) {
                 neighbors().filter { it != exceptPeerId }.forEach { sendTo(it, packet) }
             }
-        }).also { it.listener = this }
+        }, network.clock).also { it.listener = this }
 
         override fun onText(message: ChatMessage) { texts += message }
         override fun onDelivered(messageId: String) { delivered += messageId }
@@ -171,4 +175,173 @@ class MeshRouterTest {
         store.add(ChatMessage("early", "1111111111111111", "2222222222222222", "me", "hi", 1, MessageStatus.SENT, 0, outgoing = true))
         assertEquals(MessageStatus.DELIVERED, store.messages.value.single().status)
     }
+
+    /**
+     * One node announces every 30s. On the old shared cache of 4096 that evicts a text inside the
+     * one-hour acceptance window once about 35 nodes are announcing, sooner once chat and acks
+     * are added. The capacities here are that same ratio, scaled down.
+     */
+    @Test
+    fun announceChurnMustNotDeliverATextTwice() {
+        var now = 1_700_000_000_000L
+        val alice = Identity.generate()
+        val bob = Identity.generate()
+        val bobTexts = mutableListOf<ChatMessage>()
+        val captured = ArrayDeque<ByteArray>()
+        lateinit var bobRouter: MeshRouter
+
+        val aliceRouter = router(alice, clock = { now }, textSeen = 4, ephemeralSeen = 4) { bytes ->
+            captured.add(bytes.copyOf())
+            bobRouter.onPacket(bytes, alice.peerId)
+        }
+        bobRouter = router(bob, clock = { now }, textSeen = 4, ephemeralSeen = 4) { }
+        bobRouter.listener = recording(bobTexts)
+
+        aliceRouter.sendText(bob.peerId, "alice", "only once")
+        val text = captured.first()
+        assertEquals(1, bobTexts.size)
+
+        repeat(8) { i ->
+            now += 30_000
+            aliceRouter.announce("alice-$i", isSharingInternet = false)
+        }
+
+        bobRouter.onPacket(text, alice.peerId)
+        assertEquals("A text still inside the acceptance window must not be shown twice", 1, bobTexts.size)
+        assertEquals(1, bobRouter.retainedTextIds())
+    }
+
+    @Test
+    fun textCacheForgetsTheOldestTextInsteadOfGrowingWithoutBound() {
+        var now = 1_700_000_000_000L
+        val alice = Identity.generate()
+        val bob = Identity.generate()
+        val bobTexts = mutableListOf<ChatMessage>()
+        val captured = ArrayDeque<ByteArray>()
+        lateinit var bobRouter: MeshRouter
+        val aliceRouter = router(alice, clock = { now }, textSeen = 2, ephemeralSeen = 8) { bytes ->
+            captured.add(bytes.copyOf())
+            bobRouter.onPacket(bytes, alice.peerId)
+        }
+        bobRouter = router(bob, clock = { now }, textSeen = 2, ephemeralSeen = 8) { }
+        bobRouter.listener = recording(bobTexts)
+
+        aliceRouter.sendText(bob.peerId, "alice", "first")
+        val first = captured.first()
+        aliceRouter.sendText(bob.peerId, "alice", "second")
+        aliceRouter.sendText(bob.peerId, "alice", "third")
+        assertEquals(3, bobTexts.size)
+
+        bobRouter.onPacket(first, alice.peerId)
+        assertEquals("The oldest text is the one a full text cache is allowed to forget", 4, bobTexts.size)
+        assertTrue(bobRouter.retainedTextIds() <= 2)
+    }
+
+    @Test
+    fun textIdsAreDroppedAfterTheAcceptanceWindow() {
+        var now = 5_000_000L
+        val router = MeshRouter(
+            Identity.generate(),
+            object : MeshTransport {
+                override fun neighbors(): Set<String> = emptySet()
+                override fun sendTo(peerId: String, packet: ByteArray) = false
+                override fun broadcast(packet: ByteArray, exceptPeerId: String?) = Unit
+            },
+            clock = { now },
+            maxClockSkewMs = 10_000,
+        )
+        router.sendText(null, "alice", "old")
+        assertEquals(1, router.retainedTextIds())
+        now += 10_001
+        assertEquals(0, router.retainedTextIds())
+    }
+
+    @Test
+    fun directMessageIsDeliveredWhenALinkAppearsLater() {
+        var now = 5_000_000L
+        val net = Network(clock = { now })
+        val a = net.add("a")
+        val b = net.add("b")
+        val sent = a.router.sendText(b.id, "alice", "hold")
+        assertTrue(b.texts.isEmpty())
+
+        net.connect(a, b)
+        a.router.onConnectivityChanged()
+        assertEquals(sent.id, b.texts.single().id)
+        assertEquals("hello must be acknowledged once the link exists", listOf(sent.id), a.delivered)
+    }
+
+    @Test
+    fun broadcastIsFlushedWhenANeighborAppearsAndNotShownTwice() {
+        var now = 5_000_000L
+        val net = Network(clock = { now })
+        val a = net.add("a")
+        val b = net.add("b")
+        a.router.sendText(null, "alice", "all")
+        net.connect(a, b)
+        a.router.onConnectivityChanged()
+        a.router.onConnectivityChanged()
+        assertEquals(1, b.texts.size)
+    }
+
+    @Test
+    fun lostAckIsRetriedWithoutShowingTheTextTwice() {
+        var now = 5_000_000L
+        val net = Network(clock = { now })
+        val a = net.add("a")
+        val b = net.add("b")
+        net.connect(a, b)
+        net.dropAcks = true
+        val sent = a.router.sendText(b.id, "alice", "hi")
+        assertEquals(1, b.texts.size)
+        assertTrue(a.delivered.isEmpty())
+
+        net.dropAcks = false
+        now += MeshRouter.RETRY_INITIAL_MS
+        a.router.retryPending()
+        assertEquals(1, b.texts.size)
+        assertEquals(listOf(sent.id), a.delivered)
+    }
+
+    @Test
+    fun directMessageIsNotRetriedAfterTheRetryWindow() {
+        var now = 5_000_000L
+        val net = Network(clock = { now })
+        val a = net.add("a")
+        val b = net.add("b")
+        a.router.sendText(b.id, "alice", "too late")
+        now += MeshRouter.DIRECT_RETRY_MS + 1
+        net.connect(a, b)
+        a.router.onConnectivityChanged()
+        assertTrue(b.texts.isEmpty())
+    }
+
+    private fun recording(texts: MutableList<ChatMessage>) = object : MeshRouter.Listener {
+        override fun onText(message: ChatMessage) { texts += message }
+        override fun onDelivered(messageId: String) = Unit
+        override fun onAnnounce(peerId: String, nickname: String, isSharingInternet: Boolean, hops: Int) = Unit
+    }
+
+    private fun router(
+        identity: Identity,
+        clock: () -> Long,
+        textSeen: Int,
+        ephemeralSeen: Int,
+        deliver: (ByteArray) -> Unit,
+    ): MeshRouter = MeshRouter(
+        identity,
+        object : MeshTransport {
+            override fun neighbors(): Set<String> = setOf("peer")
+            override fun sendTo(peerId: String, packet: ByteArray): Boolean {
+                deliver(packet)
+                return true
+            }
+            override fun broadcast(packet: ByteArray, exceptPeerId: String?) {
+                deliver(packet)
+            }
+        },
+        clock = clock,
+        textSeenCapacity = textSeen,
+        ephemeralSeenCapacity = ephemeralSeen,
+    )
 }

@@ -170,6 +170,13 @@ class MeshNode internal constructor(private val context: Context) {
         return manager.connect(peerId, sighting.device, sighting.announcement.psm)
     }
 
+    /** The open link to [peerId], if there is one. Does not dial. */
+    fun linkedPeer(peerId: String): SecureLink? = links?.link(peerId)
+
+    /** Sends on the link currently held for [peerId]. Survives a link being replaced underneath. */
+    fun sendOnLink(peerId: String, channel: Int, body: ByteArray): Boolean =
+        links?.send(peerId, channel, body) ?: false
+
     /** Routes tunnel frames arriving from [peerId] to [endpoint], across link reconnects. */
     fun attachTunnel(peerId: String, endpoint: TunnelEndpoint) {
         tunnelEndpoints[peerId] = endpoint
@@ -191,7 +198,7 @@ class MeshNode internal constructor(private val context: Context) {
         }
         adapter!!
 
-        val manager = LinkManager(adapter, identity, router::onPacket, ::onLinkOpened, tunnelEndpoints::get)
+        val manager = LinkManager(adapter, identity, router::onPacket, ::onLinkOpened, tunnelEndpoints::get, ::onListening)
         manager.sharing = _sharing.value
         val accepting = manager.start()
         val ble = BleDiscovery(adapter, identity.peerId)
@@ -235,6 +242,8 @@ class MeshNode internal constructor(private val context: Context) {
                     delay(HOUSEKEEPING_INTERVAL_MS)
                     contacts.update { PeerDirectory.expire(it, System.currentTimeMillis()) }
                     _sharingClients.value = manager.tunnelHostCount()
+                    router.retryPending()
+                    manager.ensureListening()
                     autoLink()
                 }
             }
@@ -285,7 +294,16 @@ class MeshNode internal constructor(private val context: Context) {
     private fun onLinkOpened(peerId: String) {
         retryAt.remove(peerId)
         router.announce(_nickname.value, _sharing.value)
+        router.onConnectivityChanged()
         main.post { discovery?.restartAdvertising() }
+    }
+
+    private fun onListening(psm: Int) = onMain {
+        if (links == null || !wanted) return@onMain
+        _status.update { current ->
+            if (current.state == State.RUNNING) current.copy(canAcceptLinks = psm != 0) else current
+        }
+        if (psm != 0) discovery?.update(announcement())
     }
 
     private fun refreshAnnouncements() {

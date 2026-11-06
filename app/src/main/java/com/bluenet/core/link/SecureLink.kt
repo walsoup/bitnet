@@ -55,7 +55,6 @@ class SecureLink private constructor(
         val keepAliveIntervalMs: Long = 5_000,
         val idleTimeoutMs: Long = 20_000,
         val sendQueueCapacity: Int = 4_096,
-        val sendTimeoutMs: Long = 5_000,
         val handshakeTimeoutMs: Long = 15_000,
     )
 
@@ -92,21 +91,22 @@ class SecureLink private constructor(
         keepAlive = scheduler.scheduleWithFixedDelay(::checkKeepAlive, config.keepAliveIntervalMs, config.keepAliveIntervalMs, TimeUnit.MILLISECONDS)
     }
 
-    /** Queues a record. Returns false if the link is closed or its queue stayed full too long. */
+    /**
+     * Queues a record and returns immediately. Returns false if the link is closed or its queue
+     * is full, in which case the link is closed so the mesh can dial again.
+     *
+     * This must not block. Mesh forwarding, ping replies and tunnel writes all run on threads
+     * that also have to notice a dead peer; waiting on a stalled Bluetooth write froze those
+     * threads long enough for the idle timeout to tear the other links down too.
+     */
     fun send(channel: Int, body: ByteArray): Boolean {
         require(body.size <= MAX_BODY) { "Record body too large (${body.size} bytes)" }
         if (!open.get()) return false
         val record = ByteArray(body.size + 1)
         record[0] = channel.toByte()
         System.arraycopy(body, 0, record, 1, body.size)
-        val queued = try {
-            queue.offer(record, config.sendTimeoutMs, TimeUnit.MILLISECONDS)
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-            false
-        }
-        if (!queued) {
-            close(IOException("Send queue stalled"))
+        if (!queue.offer(record)) {
+            close(IOException("Send queue full"))
             return false
         }
         sentBytes.addAndGet(body.size.toLong())
